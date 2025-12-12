@@ -172,13 +172,13 @@ private:
         {
             Vertex vertex;
             glm::vec3 vector;
-            
+
             // 位置
             vector.x = mesh->mVertices[i].x;
             vector.y = mesh->mVertices[i].y;
             vector.z = mesh->mVertices[i].z;
             vertex.Position = vector;
-            
+
             // 法线
             if (mesh->HasNormals())
             {
@@ -187,7 +187,7 @@ private:
                 vector.z = mesh->mNormals[i].z;
                 vertex.Normal = vector;
             }
-            
+
             // 纹理坐标
             if (mesh->mTextureCoords[0])
             {
@@ -195,13 +195,13 @@ private:
                 vec.x = mesh->mTextureCoords[0][i].x;
                 vec.y = mesh->mTextureCoords[0][i].y;
                 vertex.TexCoords = vec;
-                
+
                 // 切线
                 vector.x = mesh->mTangents[i].x;
                 vector.y = mesh->mTangents[i].y;
                 vector.z = mesh->mTangents[i].z;
                 vertex.Tangent = vector;
-                
+
                 // 副切线
                 vector.x = mesh->mBitangents[i].x;
                 vector.y = mesh->mBitangents[i].y;
@@ -213,7 +213,7 @@ private:
 
             vertices.push_back(vertex);
         }
-        
+
         // 索引
         for (unsigned int i = 0; i < mesh->mNumFaces; i++)
         {
@@ -221,50 +221,88 @@ private:
             for (unsigned int j = 0; j < face.mNumIndices; j++)
                 indices.push_back(face.mIndices[j]);
         }
-        
+
+
 
         // 材质
         aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
+        glm::vec4 baseColorFactor = glm::vec4(1.0f);
+        float metallicFactor = 0.0f;
+        float roughnessFactor = 0.5f;
+        bool isGlass = false;
+        bool doubleSided = false;
 
-
-            if (!gltf)
-            {
-                // 基础颜色贴图
-                vector<Texture> albedoMaps = loadMaterialTextures(material, aiTextureType_DIFFUSE, "texture_albedo");
-                textures.insert(textures.end(), albedoMaps.begin(), albedoMaps.end());
-
-                // 法线贴图
-                std::vector<Texture> normalMaps = loadMaterialTextures(material, aiTextureType_HEIGHT, "texture_normal");
-                textures.insert(textures.end(), normalMaps.begin(), normalMaps.end());
-
-                // 金属度贴图
-                vector<Texture> metallicMaps = loadMaterialTextures(material, aiTextureType_SPECULAR, "texture_metallic");
-                textures.insert(textures.end(), metallicMaps.begin(), metallicMaps.end());
-
-                //粗糙度贴图
-                std::vector<Texture> roughnessMaps = loadMaterialTextures(material, aiTextureType_SHININESS, "texture_roughness");
-                textures.insert(textures.end(), roughnessMaps.begin(), roughnessMaps.end());
-
-                // AO贴图
-                std::vector<Texture> aoMaps = loadMaterialTextures(material, aiTextureType_AMBIENT, "texture_ao");
-                textures.insert(textures.end(), aoMaps.begin(), aoMaps.end());
-            }
-            else
-            {
-                // 基础颜色贴图
-                vector<Texture> albedoMaps = loadMaterialTextures(material, aiTextureType_BASE_COLOR, "texture_albedo");
-                textures.insert(textures.end(), albedoMaps.begin(), albedoMaps.end());
-
-                // 法线贴图
-                std::vector<Texture> normalMaps = loadMaterialTextures(material, aiTextureType_NORMALS, "texture_normal");
-                textures.insert(textures.end(), normalMaps.begin(), normalMaps.end());
-
-                // 加载粗糙度纹理和金属度纹理（GLTF金属度/粗糙度通常合并为一张纹理，需拆分）
-                std::vector<Texture> roughness_metallicMaps = loadMaterialTextures(material, aiTextureType_GLTF_METALLIC_ROUGHNESS, "gltf_texture_metallic_roughness");
-                textures.insert(textures.end(), roughness_metallicMaps.begin(), roughness_metallicMaps.end());
+        if (gltf) {
+            // 解析GLTF材质的doubleSided
+            bool doubleSide;
+            if (material->Get(AI_MATKEY_TWOSIDED, doubleSide) == AI_SUCCESS) {
+                doubleSided = (bool)doubleSide;
             }
 
-        return Mesh(vertices, indices, textures);
+            // 解析baseColorFactor（GLTF PBR）
+            aiColor4D baseColor;
+            if (material->Get(AI_MATKEY_COLOR_DIFFUSE, baseColor) == AI_SUCCESS) {
+                baseColorFactor = glm::vec4(baseColor.r, baseColor.g, baseColor.b, baseColor.a);
+            }
+
+            // 解析metallicFactor
+            float metallic;
+            if (material->Get(AI_MATKEY_METALLIC_FACTOR, metallic) == AI_SUCCESS) {
+                metallicFactor = metallic;
+            }
+
+            // 解析roughnessFactor
+            float roughness;
+            if (material->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughness) == AI_SUCCESS) {
+                roughnessFactor = roughness;
+            }
+
+            // 判断是否为玻璃材质（根据名称/参数特征）
+            aiString matName;
+            material->Get(AI_MATKEY_NAME, matName);
+            if (matName.C_Str() == string("glass") || (metallicFactor < 0.1 && roughnessFactor < 0.2 && baseColorFactor.a < 0.2)) {
+                isGlass = true;
+            }
+        }
+
+        if (!gltf)
+        {
+            // 基础颜色贴图
+            vector<Texture> albedoMaps = loadMaterialTextures(material, aiTextureType_DIFFUSE, "texture_albedo");
+            textures.insert(textures.end(), albedoMaps.begin(), albedoMaps.end());
+
+            // 法线贴图
+            std::vector<Texture> normalMaps = loadMaterialTextures(material, aiTextureType_HEIGHT, "texture_normal");
+            textures.insert(textures.end(), normalMaps.begin(), normalMaps.end());
+
+            // 金属度贴图
+            vector<Texture> metallicMaps = loadMaterialTextures(material, aiTextureType_SPECULAR, "texture_metallic");
+            textures.insert(textures.end(), metallicMaps.begin(), metallicMaps.end());
+
+            //粗糙度贴图
+            std::vector<Texture> roughnessMaps = loadMaterialTextures(material, aiTextureType_SHININESS, "texture_roughness");
+            textures.insert(textures.end(), roughnessMaps.begin(), roughnessMaps.end());
+
+            // AO贴图
+            std::vector<Texture> aoMaps = loadMaterialTextures(material, aiTextureType_AMBIENT, "texture_ao");
+            textures.insert(textures.end(), aoMaps.begin(), aoMaps.end());
+        }
+        else
+        {
+            // 基础颜色贴图
+            vector<Texture> albedoMaps = loadMaterialTextures(material, aiTextureType_BASE_COLOR, "texture_albedo");
+            textures.insert(textures.end(), albedoMaps.begin(), albedoMaps.end());
+
+            // 法线贴图
+            std::vector<Texture> normalMaps = loadMaterialTextures(material, aiTextureType_NORMALS, "texture_normal");
+            textures.insert(textures.end(), normalMaps.begin(), normalMaps.end());
+
+            // 加载粗糙度纹理和金属度纹理（GLTF金属度/粗糙度通常合并为一张纹理，需拆分）
+            std::vector<Texture> roughness_metallicMaps = loadMaterialTextures(material, aiTextureType_GLTF_METALLIC_ROUGHNESS, "gltf_texture_metallic_roughness");
+            textures.insert(textures.end(), roughness_metallicMaps.begin(), roughness_metallicMaps.end());
+        }
+
+        return Mesh(vertices, indices, textures, baseColorFactor, metallicFactor, roughnessFactor, isGlass, doubleSided);
     }
 
     // 加载材质纹理

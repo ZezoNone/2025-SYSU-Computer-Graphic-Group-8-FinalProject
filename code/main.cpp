@@ -17,7 +17,6 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow* window);
-
 unsigned int loadTexture(const char* path);
 void renderSphere();
 void renderGround();
@@ -99,11 +98,9 @@ int main()
     // -----------------------------
     glEnable(GL_DEPTH_TEST);
 
-
-
     // lights
     pointLights.push_back({ glm::vec3(0.0f, 0.0f, 10.0f),glm::vec3(150.0f, 150.0f, 150.0f),50.0f });
-    pointLights.push_back({ glm::vec3(10.0f, 0.0f, 10.0f),glm::vec3(150.0f, 150.0f, 150.0f),50.0f });
+    pointLights.push_back({ glm::vec3(10.0f, 1.0f, 10.0f),glm::vec3(300.0f, 300.0f, 300.0f),50.0f });
     initPointLights();
 
     // build and compile shaders
@@ -119,18 +116,11 @@ int main()
     shader.setInt("aoMap", 4);
     shader.setInt("metallic_roughnessMap", 2);
 
-    // load PBR material textures
-    // --------------------------
-    unsigned int albedo = loadTexture("texture/rustediron/basecolor.png");
-    unsigned int normal = loadTexture("texture/rustediron/normal.png");
-    unsigned int metallic = loadTexture("texture/rustediron/metallic.png");
-    unsigned int roughness = loadTexture("texture/rustediron/roughness.png");
-    unsigned int ao = loadTexture("texture/rustediron/ao.jpg");
-
-    Model ourModel("model/book-shelf_obj/model.obj");
-    ourModel.SetScale(glm::vec3(0.05f));
-    ourModel.SetPosition(glm::vec3(0.0f, -9.0f, 10.0f));
-    Models.push_back(ourModel);
+    //载入模型
+    Model book_shelf("model/book-shelf_obj/model.obj");
+    book_shelf.SetScale(glm::vec3(0.05f));
+    book_shelf.SetPosition(glm::vec3(0.0f, -9.0f, 10.0f));
+    Models.push_back(book_shelf);
 
     Model book1("model/book1/scene.gltf", false, true);
     book1.SetScale(glm::vec3(0.1f));
@@ -142,6 +132,25 @@ int main()
     book2.SetPosition(glm::vec3(7.0f, -0.98f, 6.0f));
     book2.Rotate(glm::vec3(-90.0f, 0.0f, -90.0f));
     Models.push_back(book2);
+
+    Model window1("model/glass_window/scene.gltf", false, true);
+    window1.SetScale(glm::vec3(1.0f));
+    window1.SetPosition(glm::vec3(10.0f, 0.0f, 7.0f));
+    window1.Rotate(glm::vec3(90.0f, 0.0f,0.0f));
+    Models.push_back(window1);
+
+    Model light1("model/ceiling_light/scene.gltf", false, true);
+    light1.SetScale(glm::vec3(0.5f));
+    light1.SetPosition(glm::vec3(10.0f, 1.1f, 10.0f));
+    light1.Rotate(glm::vec3(0.0f, 0.0f, 0.0f));
+    Models.push_back(light1);
+    // load PBR material textures
+    // --------------------------
+    unsigned int albedo = loadTexture("texture/rustediron/basecolor.png");
+    unsigned int normal = loadTexture("texture/rustediron/normal.png");
+    unsigned int metallic = loadTexture("texture/rustediron/metallic.png");
+    unsigned int roughness = loadTexture("texture/rustediron/roughness.png");
+    unsigned int ao = loadTexture("texture/rustediron/ao.jpg");
 
     unsigned int groundAlbedo = loadTexture("texture/floor/basecolor.png");       // 地面基础色
     unsigned int groundNormal = loadTexture("texture/floor/normal.png");       // 地面法线
@@ -247,17 +256,22 @@ int main()
         shader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(model))));
         renderSphere();
 
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(10.0f, 0.0f, 10.0f));
-        model = glm::scale(model, glm::vec3(0.5f));
-        shader.setMat4("model", model);
-        shader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(model))));
-        renderSphere();
-
         //加载载入模型的渲染
-        ourModel.Draw(shader);
+        book_shelf.Draw(shader);
         book1.Draw(shader);
         book2.Draw(shader);
+        light1.Draw(shader);
+
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Alpha混合
+        glDepthMask(GL_FALSE); // 半透明物体关闭深度写入
+        glDisable(GL_CULL_FACE); // 双面渲染
+
+        window1.Draw(shader);
+
+        glDepthMask(GL_TRUE);
+        glDisable(GL_BLEND);
+        glEnable(GL_CULL_FACE);
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -------------------------------------------------------------------------------

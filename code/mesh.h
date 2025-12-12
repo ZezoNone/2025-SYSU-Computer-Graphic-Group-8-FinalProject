@@ -45,12 +45,27 @@ public:
     vector<Texture>      textures;
     unsigned int VAO;
 
+    glm::vec4 baseColorFactor = glm::vec4(1.0f); // 基础色+Alpha
+    float metallicFactor = 0.0f;                 // 金属度（玻璃=0）
+    float roughnessFactor = 0.5f;                // 粗糙度（玻璃≈0.2）
+    bool isGlass = false;                        // 是否为玻璃材质
+    bool doubleSided = false;                    // 是否双面渲染
+
     // constructor
-    Mesh(vector<Vertex> vertices, vector<unsigned int> indices, vector<Texture> textures)
+    Mesh(vector<Vertex> vertices, vector<unsigned int> indices, vector<Texture> textures,
+        glm::vec4 baseColor = glm::vec4(1.0f), float metallic = 0.0f, float roughness = 0.5f,
+        bool glass = false, bool doubleSide = false)
     {
         this->vertices = vertices;
         this->indices = indices;
         this->textures = textures;
+
+        // 初始化玻璃材质参数
+        this->baseColorFactor = baseColor;
+        this->metallicFactor = metallic;
+        this->roughnessFactor = roughness;
+        this->isGlass = glass;
+        this->doubleSided = doubleSide;
 
         // now that we have all the required data, set the vertex buffers and its attribute pointers.
         setupMesh();
@@ -59,6 +74,16 @@ public:
     // render the mesh
     void Draw(Shader& shader)
     {
+
+        // 传递玻璃材质参数
+        shader.setBool("isGlass", isGlass);
+        if (isGlass)
+        {
+            shader.setVec4("glassBaseColor", baseColorFactor);
+            shader.setFloat("glassMetallic", metallicFactor);
+            shader.setFloat("glassRoughness", roughnessFactor);
+            shader.setBool("doubleSided", doubleSided);
+        }
         // bind appropriate textures
         unsigned int albedoNr = 1;
         unsigned int metallicNr = 1;
