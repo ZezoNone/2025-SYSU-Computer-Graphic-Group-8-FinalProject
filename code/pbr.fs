@@ -10,18 +10,42 @@ uniform sampler2D normalMap;
 uniform sampler2D metallicMap;
 uniform sampler2D roughnessMap;
 uniform sampler2D aoMap;
+uniform sampler2D metallic_roughnessMap;
 
-uniform float defaultMetallic; // 无metallicMap时的金属度（0~1）
-uniform float defaultRoughness;// 无roughnessMap时的粗糙度（0~1）
-uniform float defaultAO;       // 无aoMap时的AO值（建议1.0）
+uniform bool gltf;
+
+uniform float defaultMetallic; // 无metallicMap时的金属度
+uniform float defaultRoughness;// 无roughnessMap时的粗糙度
+uniform float defaultAO;       // 无aoMap时的AO值
 
 // lights
-uniform vec3 lightPositions[4];
-uniform vec3 lightColors[4];
+#define MAX_POINT_LIGHTS 4
+
+struct PointLightBase {
+    vec3 position;
+    vec3 color;
+    float far_plane;
+};
+// 2. 结构体数组（显式 uniform）
+uniform PointLightBase pointLightsBase[MAX_POINT_LIGHTS];
+// 3. 立方体贴图采样器数组（显式 uniform）
+uniform samplerCube pointLightDepthCubemaps[MAX_POINT_LIGHTS];
+// 4. 实际光源数量
+uniform int pointLightCount;
+
+// shadow
 
 uniform vec3 camPos;
 
 const float PI = 3.14159265359;
+
+vec3 sampleOffsetDirections[20] = vec3[] (
+    vec3( 1,  1,  1), vec3( 1, -1,  1), vec3(-1, -1,  1), vec3(-1,  1,  1),
+    vec3( 1,  1, -1), vec3( 1, -1, -1), vec3(-1, -1, -1), vec3(-1,  1, -1),
+    vec3( 1,  0,  1), vec3(-1,  0,  1), vec3( 1,  0, -1), vec3(-1,  0, -1),
+    vec3( 0,  1,  1), vec3( 0, -1,  1), vec3( 0, -1, -1), vec3( 0,  1, -1),
+    vec3( 1,  1,  0), vec3( 1, -1,  0), vec3(-1, -1,  0), vec3(-1,  1,  0)
+);
 // ----------------------------------------------------------------------------
 // Easy trick to get tangent-normals to world-space to keep PBR code simplified.
 // Don't worry if you don't get what's going on; you generally want to do normal 
@@ -84,19 +108,66 @@ vec3 fresnelSchlick(float cosTheta, vec3 F0)
     return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 // ----------------------------------------------------------------------------
+float calculatePointShadow(vec3 fragPos, int lightIndex) {
+    // 1. 从全局数组获取光源参数
+    vec3 lightPos = pointLightsBase[lightIndex].position;
+    float far_plane = pointLightsBase[lightIndex].far_plane;
+    
+    // 计算片段到光源的方向向量
+    vec3 fragToLight = fragPos - lightPos;
+    float currentDepth = length(fragToLight);
+
+    // 2. PCF 软阴影计算
+    float shadow = 0.0;
+    float bias = 0.15;
+    int samples = 20;
+    float diskRadius = (1.0 + (length(camPos - fragPos) / far_plane)) / 25.0;
+    
+    for(int i = 0; i < samples; ++i) {
+        float closestDepth = texture(pointLightDepthCubemaps[lightIndex], fragToLight + sampleOffsetDirections[i] * diskRadius).r;
+        closestDepth *= far_plane;
+        if(currentDepth - bias > closestDepth) {
+            shadow += 1.0;
+        }
+    }
+    shadow /= float(samples);
+
+    // 超出光源范围无阴影
+    if(currentDepth > far_plane) {
+        shadow = 0.0;
+    }
+
+    return shadow;
+}
+// ----------------------------------------------------------------------------
 void main()
-{		
-    vec3 albedo     = pow(texture(albedoMap, TexCoords).rgb, vec3(2.2));
-    float metallic  = texture(metallicMap, TexCoords).r;
-    float roughness = texture(roughnessMap, TexCoords).r;
-    float ao        = texture(aoMap, TexCoords).r;
+{	
+    vec3 albedo;
+    float metallic = 0.0;
+    float roughness = 0.5;
+    float ao = 1;
+
+    if(!gltf)
+    {
+        albedo     = pow(texture(albedoMap, TexCoords).rgb, vec3(2.2));
+        metallic  = texture(metallicMap, TexCoords).r;
+        roughness = texture(roughnessMap, TexCoords).r;
+        ao        = texture(aoMap, TexCoords).r;
+    }
+    else
+    {
+        albedo     = pow(texture(albedoMap, TexCoords).rgb, vec3(2.2));
+        metallic  = texture(metallic_roughnessMap, TexCoords).b;
+        roughness = texture(metallic_roughnessMap, TexCoords).g;
+        ao = 1.0;
+    }
 
     if(metallic < 0.001)
         metallic = defaultMetallic;
     if(roughness < 0.001)
-        metallic = defaultRoughness;
+        roughness = defaultRoughness;
     if(ao < 0.001)
-        metallic = defaultMetallic;
+        ao = defaultMetallic;
 
 
     vec3 N = getNormalFromMap();
@@ -109,14 +180,21 @@ void main()
 
     // reflectance equation
     vec3 Lo = vec3(0.0);
-    for(int i = 0; i < 4; ++i) 
-    {
+
+    for(int i = 0; i < pointLightCount; ++i) 
+    {   
+        PointLightBase light = pointLightsBase[i];
+
         // calculate per-light radiance
-        vec3 L = normalize(lightPositions[i] - WorldPos);
+        vec3 L = normalize(light.position - WorldPos);
         vec3 H = normalize(V + L);
-        float distance = length(lightPositions[i] - WorldPos);
+        float distance = length(light.position - WorldPos);
         float attenuation = 1.0 / (distance * distance);
-        vec3 radiance = lightColors[i] * attenuation;
+        vec3 radiance = light.color * attenuation;
+
+        // shadow
+        float shadow = calculatePointShadow(WorldPos, i);
+        float shadowFactor = 1.0 - shadow;
 
         // Cook-Torrance BRDF
         float NDF = DistributionGGX(N, H, roughness);   
@@ -142,7 +220,8 @@ void main()
         float NdotL = max(dot(N, L), 0.0);        
 
         // add to outgoing radiance Lo
-        Lo += (kD * albedo / PI + specular) * radiance * NdotL;  // note that we already multiplied the BRDF by the Fresnel (kS) so we won't multiply by kS again
+        Lo += (kD * albedo / PI + specular) * radiance * NdotL * shadowFactor;
+        // note that we already multiplied the BRDF by the Fresnel (kS) so we won't multiply by kS again
     }   
     
     // ambient lighting (note that the next IBL tutorial will replace 
