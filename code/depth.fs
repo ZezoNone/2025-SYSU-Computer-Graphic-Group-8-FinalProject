@@ -6,16 +6,18 @@ uniform float far_plane;
 
 uniform bool isGlass;
 
-void main() {
-        // è‹¥ä¸ºç»ç’ƒï¼Œå¼ºåˆ¶è®¾ç½®æ·±åº¦ä¸ºfar_planeï¼ˆè¶…å‡ºå…‰æºèŒƒå›´ï¼Œæ— é˜´å½±ï¼‰
-    if (isGlass) {
-        gl_FragDepth = far_plane; // ç»ç’ƒæ·±åº¦è®¾ä¸ºæœ€è¿œï¼Œä¸ä¼šè¢«é˜´å½±é‡‡æ ·å‘½ä¸­
+void main() 
+{
+     // ÈôÎª²£Á§£¬Ç¿ÖÆÉèÖÃÉî¶ÈÎªfar_plane£¨³¬³ö¹âÔ´·¶Î§£¬ÎŞÒõÓ°£©
+    if (isGlass) 
+    {
+        gl_FragDepth = far_plane; // ²£Á§Éî¶ÈÉèÎª×îÔ¶£¬²»»á±»ÒõÓ°²ÉÑùÃüÖĞ
         return;
     }
-    // è®¡ç®—ç‰‡æ®µåˆ°å…‰æºçš„çº¿æ€§è·ç¦»ï¼ˆPBR é˜´å½±éœ€è¦çº¿æ€§æ·±åº¦ï¼‰
+    // ¼ÆËãÆ¬¶Îµ½¹âÔ´µÄÏßĞÔ¾àÀë£¨PBR ÒõÓ°ĞèÒªÏßĞÔÉî¶È£©
     float lightDistance = length(FragPos.xyz - lightPos);
-    // å½’ä¸€åŒ–åˆ° [0,1] èŒƒå›´ï¼ˆæ·±åº¦ç¼“å†²é»˜è®¤èŒƒå›´ï¼‰
+    // ¹éÒ»»¯µ½ [0,1] ·¶Î§£¨Éî¶È»º³åÄ¬ÈÏ·¶Î§£©
     lightDistance = lightDistance / far_plane;
-    // å†™å…¥æ·±åº¦å€¼
+    // Ğ´ÈëÉî¶ÈÖµ
     gl_FragDepth = lightDistance;
 }

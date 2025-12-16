@@ -1,0 +1,2 @@
+运行此程序需要将code中的skybox,model和texture文件夹，以及所有的着色器文件放在同一目录下。
+assimp-vc143-mtd.dll为加载assimp库所需要的.dll文件

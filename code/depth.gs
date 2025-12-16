@@ -4,15 +4,15 @@ layout (triangle_strip, max_vertices=18) out;
 
 uniform mat4 shadowMatrices[6];
 
-out vec4 FragPos; // ä¼ é€’ä¸–ç•Œåæ ‡åˆ°ç‰‡æ®µç€è‰²å™¨
+out vec4 FragPos; // ´«µİÊÀ½ç×ø±êµ½Æ¬¶Î×ÅÉ«Æ÷
 
 void main() 
 {
     for(int face = 0; face < 6; ++face) 
     {
-        gl_Layer = face; // æŒ‡å®šæ¸²æŸ“åˆ°ç«‹æ–¹ä½“è´´å›¾çš„ç¬¬ face ä¸ªé¢
+        gl_Layer = face; // Ö¸¶¨äÖÈ¾µ½Á¢·½ÌåÌùÍ¼µÄµÚ face ¸öÃæ
         for(int i = 0; i < 3; ++i) 
-        { // éå†ä¸‰è§’å½¢çš„ 3 ä¸ªé¡¶ç‚¹
+        { // ±éÀúÈı½ÇĞÎµÄ 3 ¸ö¶¥µã
             FragPos = gl_in[i].gl_Position;
             gl_Position = shadowMatrices[face] * FragPos;
             EmitVertex();

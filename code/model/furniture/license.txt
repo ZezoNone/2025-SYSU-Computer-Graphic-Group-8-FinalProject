@@ -1,0 +1,11 @@
+Model Information:
+* title:	Modern Furniture
+* source:	https://sketchfab.com/3d-models/modern-furniture-4bc3e9f3bd8d404ba130aa58323ba9bb
+* author:	Tiago Lopes (https://sketchfab.com/drobluda)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Modern Furniture" (https://sketchfab.com/3d-models/modern-furniture-4bc3e9f3bd8d404ba130aa58323ba9bb) by Tiago Lopes (https://sketchfab.com/drobluda) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

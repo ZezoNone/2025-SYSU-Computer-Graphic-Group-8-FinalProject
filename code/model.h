@@ -10,6 +10,7 @@
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
+#include <assimp/pbrmaterial.h>
 
 #include <mesh.h>
 #include <shader.h>
@@ -31,79 +32,27 @@ public:
     vector<Texture> textures_loaded;	// 存储已加载的所有纹理，避免重复加载
     vector<Mesh>    meshes;
     string directory;
-    bool gammaCorrection;
     bool gltf;
-    
-    // 新增：模型变换相关属性
-    glm::vec3 position;       // 模型位置
-    glm::vec3 rotation;       // 模型旋转（欧拉角）
-    glm::vec3 scale;          // 模型缩放
-    glm::mat4 modelMatrix;    // 模型矩阵
 
-    // 构造函数，传入模型文件路径和伽马校正参数，确定是否加载gltf模型
-    Model(string const& path, bool gamma = false, bool gltf = false) : gammaCorrection(gamma), gltf(gltf)
-    {
-        // 初始化变换属性
-        position = glm::vec3(0.0f, 0.0f, 0.0f);
-        rotation = glm::vec3(0.0f, 0.0f, 0.0f);
-        scale = glm::vec3(1.0f, 1.0f, 1.0f);
-        modelMatrix = glm::mat4(1.0f);
-        
-        loadModel(path);
-        updateModelMatrix(); // 初始化模型矩阵
+    // 构造函数，传入模型文件路径，确定是否加载gltf模型
+    Model(string const& path, bool gltf = false) : gltf(gltf)
+    {    
+        loadModel(path); // 初始化模型矩阵
     }
 
-    // 绘制模型（更新版本，自动传递模型矩阵）
-    void Draw(Shader& shader, float metallic = 0.5, float roughness = 0.5, float ao = 1.0)
+    // 绘制模型
+    void Draw(Shader& shader,bool depth = false, float metallic = 1.0, float roughness = 1.0, float ao = 1.0)
     {
-        // 设置模型矩阵到着色器
-        updateModelMatrix();
+        if (depth)
+        {
+            for (unsigned int i = 0; i < meshes.size(); i++)
+                meshes[i].Draw(shader,true);
+            return;
+        }
         shader.setBool("gltf", gltf);
-        shader.setMat4("model", modelMatrix);
-        shader.setFloat("defaultMetallic", metallic);
-        shader.setFloat("defaultRoughness", roughness);
-        shader.setFloat("defaultAO", ao);
         // 绘制所有网格
         for (unsigned int i = 0; i < meshes.size(); i++)
             meshes[i].Draw(shader);
-    }
-
-    //移动模型（相对移动）
-    void Move(glm::vec3 offset)
-    {
-        position += offset;
-    }
-
-    // 设置模型位置（绝对位置）
-    void SetPosition(glm::vec3 newPosition)
-    {
-        position = newPosition;
-    }
-
-    // 获取当前位置
-    glm::vec3 GetPosition() const
-    {
-        return position;
-    }
-
-    //旋转模型
-    void Rotate(glm::vec3 eulerAngles)
-    {
-        rotation += eulerAngles;
-    }
-
-    //设置模型缩放
-    void SetScale(glm::vec3 newScale)
-    {
-        scale = newScale;
-    }
-
-    //重置模型变换
-    void ResetTransform()
-    {
-        position = glm::vec3(0.0f);
-        rotation = glm::vec3(0.0f);
-        scale = glm::vec3(1.0f);
     }
 
 private:
@@ -126,18 +75,19 @@ private:
         else
         {
             Assimp::Importer importer;
-            // 关键：Assimp后处理选项（适配GLTF）
+            // Assimp后处理选项（适配GLTF）
             const aiScene* scene = importer.ReadFile(path,
-                aiProcess_Triangulate           // 三角化
+                  aiProcess_Triangulate           // 三角化
                 | aiProcess_GenSmoothNormals    // 生成法线
                 | aiProcess_CalcTangentSpace    // 生成切线/副切线
                 | aiProcess_JoinIdenticalVertices // 合并重复顶点
-                | aiProcess_PopulateArmatureData // 骨骼数据（若有）
+                | aiProcess_PopulateArmatureData // 骨骼数据
                 | aiProcess_ValidateDataStructure// 验证GLTF结构
-                | aiProcess_FlipUVs //UV分解
+                | aiProcess_PreTransformVertices //烘焙节点变换
             );
 
-            if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
+            if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) 
+            {
                 std::cerr << "Assimp加载GLTF失败: " << importer.GetErrorString() << std::endl;
                 return;
             }
@@ -168,6 +118,7 @@ private:
         vector<unsigned int> indices;
         vector<Texture> textures;
 
+        // 处理顶点
         for (unsigned int i = 0; i < mesh->mNumVertices; i++)
         {
             Vertex vertex;
@@ -214,7 +165,7 @@ private:
             vertices.push_back(vertex);
         }
 
-        // 索引
+        // 处理索引
         for (unsigned int i = 0; i < mesh->mNumFaces; i++)
         {
             aiFace face = mesh->mFaces[i];
@@ -222,46 +173,69 @@ private:
                 indices.push_back(face.mIndices[j]);
         }
 
-
-
-        // 材质
+        // 处理材质
         aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
+
+        // 默认材质因子
         glm::vec4 baseColorFactor = glm::vec4(1.0f);
-        float metallicFactor = 0.0f;
-        float roughnessFactor = 0.5f;
+        float metallicFactor = 1.0f;
+        float roughnessFactor = 1.0f;
         bool isGlass = false;
         bool doubleSided = false;
+        bool isblend = false;
 
-        if (gltf) {
+
+        if (gltf) 
+        {
             // 解析GLTF材质的doubleSided
             bool doubleSide;
-            if (material->Get(AI_MATKEY_TWOSIDED, doubleSide) == AI_SUCCESS) {
+            if (material->Get(AI_MATKEY_TWOSIDED, doubleSide) == AI_SUCCESS) 
+            {
                 doubleSided = (bool)doubleSide;
             }
 
             // 解析baseColorFactor（GLTF PBR）
             aiColor4D baseColor;
-            if (material->Get(AI_MATKEY_COLOR_DIFFUSE, baseColor) == AI_SUCCESS) {
+            if (material->Get(AI_MATKEY_COLOR_DIFFUSE, baseColor) == AI_SUCCESS) 
+            {
                 baseColorFactor = glm::vec4(baseColor.r, baseColor.g, baseColor.b, baseColor.a);
             }
 
             // 解析metallicFactor
             float metallic;
-            if (material->Get(AI_MATKEY_METALLIC_FACTOR, metallic) == AI_SUCCESS) {
+            if (material->Get(AI_MATKEY_METALLIC_FACTOR, metallic) == AI_SUCCESS) 
+            {
                 metallicFactor = metallic;
             }
 
             // 解析roughnessFactor
             float roughness;
-            if (material->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughness) == AI_SUCCESS) {
+            if (material->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughness) == AI_SUCCESS) 
+            {
                 roughnessFactor = roughness;
             }
 
             // 判断是否为玻璃材质（根据名称/参数特征）
+            aiString alphaMode;
             aiString matName;
             material->Get(AI_MATKEY_NAME, matName);
-            if (matName.C_Str() == string("glass") || (metallicFactor < 0.1 && roughnessFactor < 0.2 && baseColorFactor.a < 0.2)) {
+            std::string nameStr = std::string(matName.C_Str());
+
+            // 转为小写以忽略大小写差异
+            std::transform(nameStr.begin(), nameStr.end(), nameStr.begin(), ::tolower);
+
+            // 检测是否包含 "glass"
+            if (nameStr.find("glass") != std::string::npos)
+            {
                 isGlass = true;
+            }
+            //检测材料是否启动混合
+            if (material->Get(AI_MATKEY_GLTF_ALPHAMODE, alphaMode) == AI_SUCCESS) 
+            {
+                if (aiString("BLEND") == alphaMode) 
+                {
+                    isblend = true;
+                }
             }
         }
 
@@ -292,6 +266,11 @@ private:
             // 基础颜色贴图
             vector<Texture> albedoMaps = loadMaterialTextures(material, aiTextureType_BASE_COLOR, "texture_albedo");
             textures.insert(textures.end(), albedoMaps.begin(), albedoMaps.end());
+            if (albedoMaps.empty())
+            {
+                vector<Texture> albedoMaps = loadMaterialTextures(material, aiTextureType_DIFFUSE, "texture_albedo");
+                textures.insert(textures.end(), albedoMaps.begin(), albedoMaps.end());
+            }
 
             // 法线贴图
             std::vector<Texture> normalMaps = loadMaterialTextures(material, aiTextureType_NORMALS, "texture_normal");
@@ -302,7 +281,7 @@ private:
             textures.insert(textures.end(), roughness_metallicMaps.begin(), roughness_metallicMaps.end());
         }
 
-        return Mesh(vertices, indices, textures, baseColorFactor, metallicFactor, roughnessFactor, isGlass, doubleSided);
+        return Mesh(vertices, indices, textures, baseColorFactor, metallicFactor, roughnessFactor, isGlass, doubleSided, isblend);
     }
 
     // 加载材质纹理
@@ -337,20 +316,6 @@ private:
         }
         return textures;
     }
-
-    //更新模型矩阵
-    void updateModelMatrix()
-    {
-        // 重置矩阵
-        modelMatrix = glm::mat4(1.0f);
-        
-        // 应用变换：先缩放，再旋转，最后平移
-        modelMatrix = glm::translate(modelMatrix, position);
-        modelMatrix = glm::rotate(modelMatrix, glm::radians(rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
-        modelMatrix = glm::rotate(modelMatrix, glm::radians(rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
-        modelMatrix = glm::rotate(modelMatrix, glm::radians(rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
-        modelMatrix = glm::scale(modelMatrix, scale);
-    }
 };
 
 // 纹理加载函数
@@ -361,6 +326,9 @@ unsigned int TextureFromFile(const char* path, const string& directory, bool gam
 
     unsigned int textureID;
     glGenTextures(1, &textureID);
+
+    GLint oldTextureID;
+    glGetIntegerv(GL_TEXTURE_BINDING_2D, &oldTextureID);
 
     int width, height, nrComponents;
     unsigned char* data = stbi_load(filename.c_str(), &width, &height, &nrComponents, 0);
@@ -391,6 +359,7 @@ unsigned int TextureFromFile(const char* path, const string& directory, bool gam
         std::cout << "Texture failed to load at path: " << path << std::endl;
         stbi_image_free(data);
     }
+    glBindTexture(GL_TEXTURE_2D, oldTextureID);
 
     return textureID;
 }
