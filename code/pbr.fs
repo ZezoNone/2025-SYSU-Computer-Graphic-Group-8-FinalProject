@@ -54,7 +54,7 @@ uniform vec3 camPos;
 
 const float PI = 3.14159265359;
 
-// ²ÉÑùÆ«ÒÆÊı×é
+// é‡‡æ ·åç§»æ•°ç»„
 vec3 sampleOffsetDirections[20] = vec3[] (
     vec3( 1,  1,  1), vec3( 1, -1,  1), vec3(-1, -1,  1), vec3(-1,  1,  1),
     vec3( 1,  1, -1), vec3( 1, -1, -1), vec3(-1, -1, -1), vec3(-1,  1, -1),
@@ -64,27 +64,27 @@ vec3 sampleOffsetDirections[20] = vec3[] (
 );
 vec2 ParallaxMapping(vec2 texCoords, vec3 viewDir, float currentHeightScale)
 {
-    // Ô¤¼ÆËãµ¼Êı
+    // é¢„è®¡ç®—å¯¼æ•°
     vec2 dx = dFdx(texCoords);
     vec2 dy = dFdy(texCoords);
 
-    // ¶¯Ì¬²ãÊı (¸ù¾İÊÓ½ÇÓÅ»¯ĞÔÄÜ)
+    // åŠ¨æ€å±‚æ•° (æ ¹æ®è§†è§’ä¼˜åŒ–æ€§èƒ½)
     const float minLayers = 8.0;
     const float maxLayers = 32.0;
-    // ÊÓ½ÇÔ½Æ½(zÔ½Ğ¡)£¬²ãÊıÔ½¶à
+    // è§†è§’è¶Šå¹³(zè¶Šå°)ï¼Œå±‚æ•°è¶Šå¤š
     float numLayers = mix(maxLayers, minLayers, abs(dot(vec3(0.0, 0.0, 1.0), viewDir)));  
     float layerDepth = 1.0 / numLayers;
     float currentLayerDepth = 0.0;
     
-    // ĞŞÕıÆ«ÒÆ·½Ïò
+    // ä¿®æ­£åç§»æ–¹å‘
     vec2 P = viewDir.xy / viewDir.z * currentHeightScale; 
     vec2 deltaTexCoords = P / numLayers;
   
     vec2  currentTexCoords = texCoords;
     
 
-    // Ñ­»·²ÉÑù
-    // ³õÊ¼²ÉÑù
+    // å¾ªç¯é‡‡æ ·
+    // åˆå§‹é‡‡æ ·
     float heightValue = textureGrad(heightMap, currentTexCoords, dx, dy).r;
     if (heightMapInvert) heightValue = 1.0 - heightValue;
 
@@ -101,7 +101,7 @@ vec2 ParallaxMapping(vec2 texCoords, vec3 viewDir, float currentHeightScale)
         currentLayerDepth += layerDepth;  
     }
     
-    //  Éî¶È²åÖµ
+    //  æ·±åº¦æ’å€¼
     vec2 prevTexCoords = currentTexCoords + deltaTexCoords;
     float afterDepth  = currentDepthMapValue - currentLayerDepth;
     
@@ -125,7 +125,7 @@ vec3 getNormalFromMap(vec2 uv)
     return normalize(TBN * tangentNormal);
 }
 
-// GGX/Trowbridge-Reitz ·¨Ïß·Ö²¼º¯Êı
+// GGX/Trowbridge-Reitz æ³•çº¿åˆ†å¸ƒå‡½æ•°
 float DistributionGGX(vec3 N, vec3 H, float roughness)
 {
     float a = roughness*roughness;
@@ -140,7 +140,7 @@ float DistributionGGX(vec3 N, vec3 H, float roughness)
     return nom / denom;
 }
 
-// ¼¸ºÎÕÚµ²º¯Êı£¨Schlick-GGX£©
+// å‡ ä½•é®æŒ¡å‡½æ•°ï¼ˆSchlick-GGXï¼‰
 float GeometrySchlickGGX(float NdotV, float roughness)
 {
     float r = (roughness + 1.0);
@@ -152,7 +152,7 @@ float GeometrySchlickGGX(float NdotV, float roughness)
     return nom / denom;
 }
 
-// ¼¸ºÎÒõÓ°º¯Êı£¨Smith£©
+// å‡ ä½•é˜´å½±å‡½æ•°ï¼ˆSmithï¼‰
 float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
 {
     float NdotV = max(dot(N, V), 0.0);
@@ -164,19 +164,19 @@ float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
 }
 
 
-// ·ÆÄù¶û·½³Ì£¨»ù´¡°æ£©
+// è²æ¶…å°”æ–¹ç¨‹ï¼ˆåŸºç¡€ç‰ˆï¼‰
 vec3 fresnelSchlick(float cosTheta, vec3 F0)
 {
     return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
-// ·ÆÄù¶û·½³Ì£¨´ø´Ö²Ú¶È£¬ÓÃÓÚIBL£©
+// è²æ¶…å°”æ–¹ç¨‹ï¼ˆå¸¦ç²—ç³™åº¦ï¼Œç”¨äºIBLï¼‰
 vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness)
 {
     return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
-// ÈíÒõÓ°¼ÆËã
+// è½¯é˜´å½±è®¡ç®—
 float calculatePointShadow(vec3 fragPos, int lightIndex, vec3 N) 
 {
     vec3 lightPos = pointLightsBase[lightIndex].position;
@@ -189,7 +189,7 @@ float calculatePointShadow(vec3 fragPos, int lightIndex, vec3 N)
     
     float bias = usePOM ? 0.08 : mix(0.05, 0.005, NdotL);
     
-    if (isGlass) bias = 0.5; // ²£Á§ÌØÊâ´¦Àí
+    if (isGlass) bias = 0.5; // ç»ç’ƒç‰¹æ®Šå¤„ç†
     
     int samples = 20;
     float diskRadius = (1.0 + (length(camPos - fragPos) / far_plane)) / 25.0;
@@ -212,7 +212,7 @@ void main()
 {	
     vec3 viewDirWorld = normalize(camPos - WorldPos);
     
-    // ¾àÀëµ­³ö
+    // è·ç¦»æ·¡å‡º
     float viewDistance = length(camPos - WorldPos);
     float pomFadeStart = 10.0;
     float pomFadeEnd = 30.0;
@@ -221,15 +221,15 @@ void main()
     vec2 finalTexCoords = TexCoords;
     if (usePOM && pomFactor > 0.01 && !isGlass)
     {
-        // ¼ÆËãÇĞÏß¿Õ¼äÊÓÏß·½Ïò
+        // è®¡ç®—åˆ‡çº¿ç©ºé—´è§†çº¿æ–¹å‘
         vec3 viewDirTangent = normalize(TangentViewPos - TangentFragPos);
         
-        // ¶¯Ì¬µ÷Õû¸ß¶ÈËõ·Å (Ô¶´¦¼õÈõÎª0)
+        // åŠ¨æ€è°ƒæ•´é«˜åº¦ç¼©æ”¾ (è¿œå¤„å‡å¼±ä¸º0)
         float effectiveHeightScale = heightScale * pomFactor;
         
         finalTexCoords = ParallaxMapping(TexCoords, viewDirTangent, effectiveHeightScale);
         
-        // ¶ªÆú±ßÔµ (·ÀÖ¹ÎÆÀíÖØ¸´´¦µÄÎ±Ó°)
+        // ä¸¢å¼ƒè¾¹ç¼˜ (é˜²æ­¢çº¹ç†é‡å¤å¤„çš„ä¼ªå½±)
         if(finalTexCoords.x > 1.0 || finalTexCoords.y > 1.0 || finalTexCoords.x < 0.0 || finalTexCoords.y < 0.0)
             discard; 
     }
@@ -281,12 +281,12 @@ void main()
         ao = texture(aoMap, finalTexCoords).r;
     }
 
-    // Êı¾İ¹éÒ»»¯
+    // æ•°æ®å½’ä¸€åŒ–
     metallic = clamp(metallic, 0.0, 1.0);
     roughness = clamp(roughness, 0.01, 0.99);
     ao = clamp(ao, 0.0, 1.0);
 
-    // ÌáÈ¡ RGB ÓÃÓÚ¹âÕÕ¼ÆËã
+    // æå– RGB ç”¨äºå…‰ç…§è®¡ç®—
     vec3 albedo = albedoData.rgb;
     float alpha = albedoData.a;
 
@@ -294,10 +294,10 @@ void main()
     vec3 V = viewDirWorld;
     vec3 R = reflect(-V, N); 
 
-    // ²£Á§²ÄÖÊÂß¼­
+    // ç»ç’ƒæè´¨é€»è¾‘
     if (isGlass) 
     {
-        // Ë«ÃæäÖÈ¾´¦Àí
+        // åŒé¢æ¸²æŸ“å¤„ç†
         if (doubleSided && dot(N, V) < 0.0) {
             N = -N;
         }
@@ -305,12 +305,12 @@ void main()
         vec3 F0 = vec3(0.04); 
         F0 = mix(F0, albedo, metallic);
 
-        // ÕÛÉäÂÊ²ÎÊı
+        // æŠ˜å°„ç‡å‚æ•°
         const float IOR_GLASS = 1.52;
         const float IOR_AIR = 1.0;
         vec3 Lo = vec3(0.0);
 
-        // Öğ¹âÔ´¼ÆËã
+        // é€å…‰æºè®¡ç®—
         for(int i = 0; i < pointLightCount; ++i) 
         {   
             PointLightBase light = pointLightsBase[i];
@@ -320,7 +320,11 @@ void main()
             float attenuation = 1.0 / (distance * distance);
             vec3 radiance = light.color * attenuation;
 
-            // BRDF¼ÆËã
+            if(distance > light.far_plane)
+            {
+                continue;
+            }
+            // BRDFè®¡ç®—
             float NDF = DistributionGGX(N, H, roughness);   
             float G   = GeometrySmith(N, V, L, roughness);      
             vec3 F    = fresnelSchlick(max(dot(H, V), 0.0), F0);
@@ -329,7 +333,7 @@ void main()
             float denominator = 4.0 * max(dot(N, V), 0.001) * max(dot(N, L), 0.001);
             vec3 specular = numerator / denominator;
             
-            // ²£Á§Í¸Éä¹â¼ÆËã
+            // ç»ç’ƒé€å°„å…‰è®¡ç®—
             vec3 transmitLight = vec3(0.0);
             float NdotV = max(dot(N, V), 0.0);
             vec3 transmitDir = refract(-V, N, IOR_AIR / IOR_GLASS);
@@ -342,7 +346,7 @@ void main()
                 transmitLight *= (1.0 - roughness * 0.5);
             }
 
-            // ÄÜÁ¿ÊØºã
+            // èƒ½é‡å®ˆæ’
             vec3 kS = F;
             vec3 kD = vec3(1.0) - kS;
             kD *= 1.0 - metallic;	  
@@ -351,7 +355,7 @@ void main()
             Lo += specular * radiance * NdotL + transmitLight * kD;
         }   
 
-        // IBL»·¾³¹â¼ÆËã
+        // IBLç¯å¢ƒå…‰è®¡ç®—
         vec3 F = fresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
         vec3 kS = F;
         vec3 kD = 1.0 - kS;
@@ -367,26 +371,26 @@ void main()
 
         vec3 ambient = (kD * diffuse + specular) * alpha;
     
-        // É«µ÷Ó³Éä + GammaĞ£Õı
+        // è‰²è°ƒæ˜ å°„ + Gammaæ ¡æ­£
         vec3 color = ambient + Lo;
         color = color / (color + vec3(1.0));
         color = pow(color, vec3(1.0/2.2)); 
 
         FragColor = vec4(color, alpha);
     } 
-    // ·Ç²£Á§²ÄÖÊ£©
+    // éç»ç’ƒæè´¨ï¼‰
     else
     {
-        // ²ÎÊı¹éÒ»»¯
+        // å‚æ•°å½’ä¸€åŒ–
         metallic = clamp(metallic, 0.0, 1.0);
         roughness = clamp(roughness, 0.01, 0.99);
         ao = clamp(ao, 0.0, 1.0);
 
-        // »ù´¡·´ÉäÂÊF0
+        // åŸºç¡€åå°„ç‡F0
         vec3 F0 = vec3(0.04); 
         F0 = mix(F0, albedo, metallic);
 
-        // Öğ¹âÔ´¼ÆËãÖ±½Ó¹âÕÕ
+        // é€å…‰æºè®¡ç®—ç›´æ¥å…‰ç…§
         vec3 Lo = vec3(0.0);
         for(int i = 0; i < pointLightCount; ++i) 
         {   
@@ -397,11 +401,16 @@ void main()
             float attenuation = 1.0 / (distance * distance);
             vec3 radiance = light.color * attenuation;
 
-            // ÒõÓ°¼ÆËã
+            if(distance > light.far_plane)
+            {
+                continue;
+            }
+
+            // é˜´å½±è®¡ç®—
             float shadow = calculatePointShadow(WorldPos, i, N);
             float shadowFactor = 1.0 - shadow;
 
-            // BRDF¼ÆËã
+            // BRDFè®¡ç®—
             float NDF = DistributionGGX(N, H, roughness);   
             float G   = GeometrySmith(N, V, L, roughness);      
             vec3 F    = fresnelSchlick(max(dot(H, V), 0.0), F0);
@@ -410,7 +419,7 @@ void main()
             float denominator = 4.0 * max(dot(N, V), 0.001) * max(dot(N, L), 0.001);
             vec3 specular = numerator / denominator;
         
-            // ÄÜÁ¿ÊØºã
+            // èƒ½é‡å®ˆæ’
             vec3 kS = F;
             vec3 kD = vec3(1.0) - kS;
             kD *= 1.0 - metallic;	  
@@ -419,14 +428,14 @@ void main()
             Lo += (kD * albedo / PI + specular) * radiance * NdotL * shadowFactor;
         }   
 
-        // IBL»·¾³¹â¼ÆËã
+        // IBLç¯å¢ƒå…‰è®¡ç®—
         vec3 F = fresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
         vec3 kS = F;
         vec3 kD = 1.0 - kS;
         kD *= 1.0 - metallic;	  
 
         vec3 irradiance = texture(irradianceMap, N).rgb;
-        irradiance = clamp(irradiance, vec3(0.0), vec3(0.5)); // ÏŞÖÆ»·¾³¹âÇ¿¶È
+        irradiance = clamp(irradiance, vec3(0.0), vec3(0.5)); // é™åˆ¶ç¯å¢ƒå…‰å¼ºåº¦
         vec3 diffuse = irradiance * albedo;
 
         const float MAX_REFLECTION_LOD = 4.0;
@@ -434,13 +443,13 @@ void main()
         vec2 brdf = texture(brdfLUT, vec2(max(dot(N, V), 0.0), roughness)).rg;
         vec3 specular = prefilteredColor * (F * brdf.x + brdf.y);
 
-        // »·¾³¹âµş¼ÓAO
+        // ç¯å¢ƒå…‰å åŠ AO
         vec3 ambient = (kD * diffuse + specular) * ao;
     
-        // ×îÖÕÑÕÉ«¼ÆËã
+        // æœ€ç»ˆé¢œè‰²è®¡ç®—
         vec3 color = ambient + Lo;
-        color = color / (color + vec3(1.0)); // ReinhardÉ«µ÷Ó³Éä
-        color = pow(color, vec3(1.0/2.2));  // GammaĞ£Õı
+        color = color / (color + vec3(1.0)); // Reinhardè‰²è°ƒæ˜ å°„
+        color = pow(color, vec3(1.0/2.2));  // Gammaæ ¡æ­£
 
         FragColor = vec4(color, alpha);
     }
