@@ -100,6 +100,18 @@ public:
 		// 保存深度测试函数（天空盒依赖GL_LEQUAL）
 		glGetIntegerv(GL_DEPTH_FUNC, &oldDepthFunc);
 
+		shader.setBool("useAlbedoMap", false);
+		shader.setBool("useNormalMap", false);
+		shader.setBool("useMetallicRoughnessMap", false);
+		shader.setBool("useAOMap", false);
+		shader.setBool("useMetallicMap", false);
+		shader.setBool("useRoughnessMap", false);
+		shader.setBool("isGlass", false);
+		shader.setBool("doubleSided", false);
+		shader.setVec4("materialBaseColor", glm::vec4(1.0f));
+		shader.setFloat("materialMetallic", 1.0f);
+		shader.setFloat("materialRoughness", 1.0f);
+
 		// 传递PBR材质因子
 		shader.setVec4("materialBaseColor", baseColorFactor);
 		shader.setFloat("materialMetallic", metallicFactor);
@@ -119,51 +131,52 @@ public:
 		// 绑定纹理
 		if (!isGlass)
 		{
-			unsigned int albedoNr = 1;
-			unsigned int metallicNr = 1;
-			unsigned int normalNr = 1;
-			unsigned int aoNr = 1;
-			unsigned int roughnessNr = 1;
-			unsigned int gltfmetallroughNr = 1;
+			//unsigned int albedoNr = 1;
+			//unsigned int metallicNr = 1;
+			//unsigned int normalNr = 1;
+			//unsigned int aoNr = 1;
+			//unsigned int roughnessNr = 1;
+			//unsigned int gltfmetallroughNr = 1;
 			for (unsigned int i = 0; i < textures.size(); i++)
 			{
 				// 纹理单元从3开始，避开IBL/天空盒的0-2号单元
 				glActiveTexture(GL_TEXTURE3 + i);
 				string number;
 				string name = textures[i].type;
-				if (name == "texture_albedo")
+				if (name == "albedoMap")
 				{
-					number = std::to_string(albedoNr++);
+					//number = std::to_string(albedoNr++);
 					hasAlbedo = true;
 				}
-				else if (name == "texture_metallic")
+				else if (name == "metallicMap")
 				{
-					number = std::to_string(metallicNr++);
+					//number = std::to_string(metallicNr++);
 					hasMetallic = true;
 				}
-				else if (name == "texture_normal")
+				else if (name == "normalMap")
 				{
-					number = std::to_string(normalNr++);
+					//number = std::to_string(normalNr++);
 					hasNormal = true;
 				}
-				else if (name == "texture_ao")
+				else if (name == "aoMap")
 				{
-					number = std::to_string(aoNr++);
+					//number = std::to_string(aoNr++);
 					hasAO = true;
 				}
-				else if (name == "texture_roughness")
+				else if (name == "roughnessMap")
 				{
-					number = std::to_string(roughnessNr++);
+					//number = std::to_string(roughnessNr++);
 					hasRoughness = true;
 				}
-				else if (name == "gltf_texture_metallic_roughness")
+				else if (name == "metallic_roughnessMap")
 				{
-					number = std::to_string(gltfmetallroughNr++);
+					//number = std::to_string(gltfmetallroughNr++);
 					hasMetallicRoughness = true;
 				}
 
-				glUniform1i(glGetUniformLocation(shader.ID, (name + number).c_str()), i + 3);
 				glBindTexture(GL_TEXTURE_2D, textures[i].id);
+				glUniform1i(glGetUniformLocation(shader.ID, (name).c_str()), i + 3);
+
 			}
 		}
 		else
