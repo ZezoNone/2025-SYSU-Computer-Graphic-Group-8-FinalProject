@@ -242,42 +242,42 @@ private:
         if (!gltf)
         {
             // 基础颜色贴图
-            vector<Texture> albedoMaps = loadMaterialTextures(material, aiTextureType_DIFFUSE, "texture_albedo");
+            vector<Texture> albedoMaps = loadMaterialTextures(material, aiTextureType_DIFFUSE, "albedoMap");
             textures.insert(textures.end(), albedoMaps.begin(), albedoMaps.end());
 
             // 法线贴图
-            std::vector<Texture> normalMaps = loadMaterialTextures(material, aiTextureType_HEIGHT, "texture_normal");
+            std::vector<Texture> normalMaps = loadMaterialTextures(material, aiTextureType_HEIGHT, "normalMap");
             textures.insert(textures.end(), normalMaps.begin(), normalMaps.end());
 
             // 金属度贴图
-            vector<Texture> metallicMaps = loadMaterialTextures(material, aiTextureType_SPECULAR, "texture_metallic");
+            vector<Texture> metallicMaps = loadMaterialTextures(material, aiTextureType_SPECULAR, "metallicMap");
             textures.insert(textures.end(), metallicMaps.begin(), metallicMaps.end());
 
             //粗糙度贴图
-            std::vector<Texture> roughnessMaps = loadMaterialTextures(material, aiTextureType_SHININESS, "texture_roughness");
+            std::vector<Texture> roughnessMaps = loadMaterialTextures(material, aiTextureType_SHININESS, "roughnessMap");
             textures.insert(textures.end(), roughnessMaps.begin(), roughnessMaps.end());
 
             // AO贴图
-            std::vector<Texture> aoMaps = loadMaterialTextures(material, aiTextureType_AMBIENT, "texture_ao");
+            std::vector<Texture> aoMaps = loadMaterialTextures(material, aiTextureType_AMBIENT, "aoMap");
             textures.insert(textures.end(), aoMaps.begin(), aoMaps.end());
         }
         else
         {
             // 基础颜色贴图
-            vector<Texture> albedoMaps = loadMaterialTextures(material, aiTextureType_BASE_COLOR, "texture_albedo");
+            vector<Texture> albedoMaps = loadMaterialTextures(material, aiTextureType_BASE_COLOR, "albedoMap");
             textures.insert(textures.end(), albedoMaps.begin(), albedoMaps.end());
             if (albedoMaps.empty())
             {
-                vector<Texture> albedoMaps = loadMaterialTextures(material, aiTextureType_DIFFUSE, "texture_albedo");
+                vector<Texture> albedoMaps = loadMaterialTextures(material, aiTextureType_DIFFUSE, "albedoMap");
                 textures.insert(textures.end(), albedoMaps.begin(), albedoMaps.end());
             }
 
             // 法线贴图
-            std::vector<Texture> normalMaps = loadMaterialTextures(material, aiTextureType_NORMALS, "texture_normal");
+            std::vector<Texture> normalMaps = loadMaterialTextures(material, aiTextureType_NORMALS, "normalMap");
             textures.insert(textures.end(), normalMaps.begin(), normalMaps.end());
 
             // 加载粗糙度纹理和金属度纹理（GLTF金属度/粗糙度通常合并为一张纹理，需拆分）
-            std::vector<Texture> roughness_metallicMaps = loadMaterialTextures(material, aiTextureType_GLTF_METALLIC_ROUGHNESS, "gltf_texture_metallic_roughness");
+            std::vector<Texture> roughness_metallicMaps = loadMaterialTextures(material, aiTextureType_GLTF_METALLIC_ROUGHNESS, "metallic_roughnessMap");
             textures.insert(textures.end(), roughness_metallicMaps.begin(), roughness_metallicMaps.end());
         }
 

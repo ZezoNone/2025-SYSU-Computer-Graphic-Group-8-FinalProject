@@ -380,8 +380,6 @@ int main()
 	sceneObjects.emplace_back(resBooks2, glm::vec3(14.5f + set5_x, 2.67f, -12.0f + set5_z), glm::vec3(0.0f), glm::vec3(3.13f));
 	sceneObjects.emplace_back(resBook3, glm::vec3(11.47f + set5_x, 2.63f, -12.71f + set5_z), glm::vec3(127.5f, 270.3f, 127.7f), glm::vec3(0.447f));
 
-	sceneObjects.emplace_back(resWindow, glm::vec3(0.009f, 4.35f, 27.48f), glm::vec3(0.0f), glm::vec3(0.87f, 2.63f, 3.93f));
-	sceneObjects.emplace_back(resWindow, glm::vec3(19.99f, 4.38f, 27.48f), glm::vec3(0.0f), glm::vec3(0.86f, 2.63f, 2.73f));
 	sceneObjects.emplace_back(resfurniture, glm::vec3(15.4316, 0.0038861, 26.7556), glm::vec3(0.0f, 180.0f, 0.0f), glm::vec3(1.16696, 2.06043, 2.0505));
 	sceneObjects.emplace_back(resfurniture, glm::vec3(10.4316, 0.0038861, 26.7556), glm::vec3(0.0f, 180.0f, 0.0f), glm::vec3(1.16696, 2.06043, 2.0505));
 	sceneObjects.emplace_back(resfurniture, glm::vec3(26.8158, -0.690885, 20.8633), glm::vec3(0.0f, 270.0f, 0.0f), glm::vec3(1.16696, 2.06043, 2.0505));
@@ -401,6 +399,9 @@ int main()
 	sceneObjects.emplace_back(respicture2, glm::vec3(-21.9017, 8.53611, 10.7215), glm::vec3(0.0f, 90.0f, 0.0f), glm::vec3(0.086184));
 	sceneObjects.emplace_back(respicture1, glm::vec3(-21.9169, 5.02535, 12.8817), glm::vec3(0.0f, 90.0f, 0.0f), glm::vec3(3.38485));
 	sceneObjects.emplace_back(respicture1, glm::vec3(-0.206604, 3.14911, -22.0161), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(3.40435));
+
+	sceneObjects.emplace_back(resWindow, glm::vec3(19.99f, 4.38f, 27.48f), glm::vec3(0.0f), glm::vec3(0.86f, 2.63f, 2.73f));
+	sceneObjects.emplace_back(resWindow, glm::vec3(0.009f, 4.35f, 27.48f), glm::vec3(0.0f), glm::vec3(0.87f, 2.63f, 3.93f));
 
 	// --------------------------
 	// 纹理加载
