@@ -1,0 +1,72 @@
+cmake_minimum_required(VERSION 3.20)
+project(FinalProject LANGUAGES CXX)
+
+# ===============================
+# C++标准
+# ===============================
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# ===============================
+# 设置构建类型为 Release
+# ===============================
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
+
+# ===============================
+# 第三方库
+# ===============================
+
+# GLFW
+add_subdirectory(third_party/glfw)
+
+# Assimp 只编译静态库
+set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(ASSIMP_BUILD_ASSIMP_TOOLS OFF CACHE BOOL "" FORCE)
+set(ASSIMP_BUILD_SAMPLES OFF CACHE BOOL "" FORCE)
+set(ASSIMP_INSTALL OFF CACHE BOOL "" FORCE)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)  # 强制静态库
+add_subdirectory(third_party/assimp-6.0.2)
+
+# GLM
+add_library(glm INTERFACE)
+target_include_directories(glm INTERFACE third_party/glm)
+
+# GLAD
+add_library(glad src/glad.c)
+target_include_directories(glad PUBLIC third_party/glad/include)
+
+# ===============================
+# 主程序
+# ===============================
+file(GLOB_RECURSE CPP_FILES src/*.cpp)
+file(GLOB_RECURSE HEADER_FILES src/*.h)
+
+include_directories(
+    include
+    third_party/stb
+)
+
+add_executable(FinalProject
+    ${CPP_FILES}
+    ${HEADER_FILES}
+)
+
+target_link_libraries(FinalProject PRIVATE
+    glfw
+    glad
+    glm
+    assimp
+)
+
+if (WIN32)
+    target_link_libraries(FinalProject PRIVATE opengl32)
+endif()
+
+# 输出目录,对多配置生成器生效
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG   ${CMAKE_SOURCE_DIR}/out/Debug)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_SOURCE_DIR}/out/Release)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_SOURCE_DIR}/out/RelWithDebInfo)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL ${CMAKE_SOURCE_DIR}/out/MinSizeRel)
+

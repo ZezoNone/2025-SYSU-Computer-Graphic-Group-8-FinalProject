@@ -1,3 +1,0 @@
-运行此程序需要将code中的skybox,model和texture文件夹，以及所有的着色器文件放在同一目录下。
-注意skybox中的hdr文件因为超过100MB为压缩包格式，使用前先解压
-assimp-vc143-mtd.dll为加载assimp库所需要的.dll文件
