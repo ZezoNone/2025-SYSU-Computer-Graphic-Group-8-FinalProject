@@ -1,0 +1,1 @@
+由于可执行文件的路径依赖暂未有较好的处理方案，故用脚本 run_project.bat 调用生成在 code 文件夹中的 FinalProject.exe 的方式代替。

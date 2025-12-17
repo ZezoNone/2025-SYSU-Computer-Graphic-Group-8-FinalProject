@@ -1,0 +1,11 @@
+Model Information:
+* title:	Frame Picture Landscape
+* source:	https://sketchfab.com/3d-models/frame-picture-landscape-4f63861f822646c682c5358715788ab5
+* author:	3Dtiptut (https://sketchfab.com/3Dtiptut)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Frame Picture Landscape" (https://sketchfab.com/3d-models/frame-picture-landscape-4f63861f822646c682c5358715788ab5) by 3Dtiptut (https://sketchfab.com/3Dtiptut) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

@@ -19,7 +19,7 @@ endif()
 # ===============================
 
 # GLFW
-add_subdirectory(third_party/glfw)
+add_subdirectory(code/third_party/glfw)
 
 # Assimp 只编译静态库
 set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -27,25 +27,25 @@ set(ASSIMP_BUILD_ASSIMP_TOOLS OFF CACHE BOOL "" FORCE)
 set(ASSIMP_BUILD_SAMPLES OFF CACHE BOOL "" FORCE)
 set(ASSIMP_INSTALL OFF CACHE BOOL "" FORCE)
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)  # 强制静态库
-add_subdirectory(third_party/assimp-6.0.2)
+add_subdirectory(code/third_party/assimp-6.0.2)
 
 # GLM
 add_library(glm INTERFACE)
-target_include_directories(glm INTERFACE third_party/glm)
+target_include_directories(glm INTERFACE code/third_party/glm)
 
 # GLAD
-add_library(glad src/glad.c)
-target_include_directories(glad PUBLIC third_party/glad/include)
+add_library(glad code/src/glad.c)
+target_include_directories(glad PUBLIC code/third_party/glad/include)
 
 # ===============================
 # 主程序
 # ===============================
-file(GLOB_RECURSE CPP_FILES src/*.cpp)
-file(GLOB_RECURSE HEADER_FILES src/*.h)
+file(GLOB_RECURSE CPP_FILES code/src/*.cpp)
+file(GLOB_RECURSE HEADER_FILES code/src/*.h)
 
 include_directories(
-    include
-    third_party/stb
+    code/include
+    code/third_party/stb
 )
 
 add_executable(FinalProject

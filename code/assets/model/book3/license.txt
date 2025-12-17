@@ -1,0 +1,11 @@
+Model Information:
+* title:	Old leather book
+* source:	https://sketchfab.com/3d-models/old-leather-book-0c9957338432477bb6eb6f0609bc3062
+* author:	Slan3D (https://sketchfab.com/slan3d)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Old leather book" (https://sketchfab.com/3d-models/old-leather-book-0c9957338432477bb6eb6f0609bc3062) by Slan3D (https://sketchfab.com/slan3d) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
