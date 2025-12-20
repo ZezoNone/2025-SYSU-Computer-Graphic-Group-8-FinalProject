@@ -65,12 +65,17 @@ struct Object
 	{
 		glm::mat4 modelMatrix = getModelMatrix();
 		shader.setMat4("model", modelMatrix);
+		shader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(modelMatrix))));
 		modelData->Draw(shader);
 	}
 
 	// 深度/阴影渲染
 	void DrawDepth(Shader& shader)
 	{
+		//if (modelData == getModelResource("model/ceiling_light/scene.gltf", true))
+		//{
+		//	return;
+		//}
 		glm::mat4 modelMatrix = getModelMatrix();
 		shader.setMat4("model", modelMatrix);
 		// 使用深度模式绘制
@@ -81,7 +86,6 @@ struct Object
 
 // 场景中的所有物体列表
 std::vector<Object> sceneObjects;
-
 
 // ==========================================
 // 控制参数与回调声明
@@ -163,8 +167,8 @@ void initPointLights();
 void renderAllObjectsToDepth(Shader& depthShader);
 
 // settings
-const unsigned int SCR_WIDTH = 1280;
-const unsigned int SCR_HEIGHT = 720;
+unsigned int SCR_WIDTH = 1280;
+unsigned int SCR_HEIGHT = 720;
 const unsigned int SHADOW_WIDTH = 1024;
 const unsigned int SHADOW_HEIGHT = 1024;
 const unsigned int MAX_POINT_LIGHTS = 4;
@@ -180,6 +184,8 @@ struct PointLight
 {
 	glm::vec3 position;
 	glm::vec3 color;
+	glm::vec3 direction;
+	float cutOff;
 	float far_plane;
 	unsigned int depthCubemap;
 	unsigned int depthFBO;
@@ -190,6 +196,7 @@ std::vector<PointLight> pointLights;
 // timing
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
+
 
 int main()
 {
@@ -204,7 +211,7 @@ int main()
 	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
 
-	GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "CG_Group8_FinalProject_V1.0", NULL, NULL);
+	GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "CG_Group8_FinalProject_V2.0", NULL, NULL);
 	glfwMakeContextCurrent(window);
 	if (window == NULL)
 	{
@@ -216,20 +223,13 @@ int main()
 	glfwSetCursorPosCallback(window, mouse_callback);
 	glfwSetScrollCallback(window, scroll_callback);
 	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+	glfwSwapInterval(0);
 
 	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
 	{
 		std::cout << "Failed to initialize GLAD" << std::endl;
 		return -1;
 	}
-
-	glEnable(GL_DEPTH_TEST);
-	glDepthFunc(GL_LEQUAL);
-	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
-
-	// 开启混合
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	// 加载着色器
 	Shader pbrShader("../code/assets/shader/pbr.vs", "../code/assets/shader/pbr.fs");
@@ -239,6 +239,7 @@ int main()
 	Shader prefilterShader("../code/assets/shader/cubemap.vs", "../code/assets/shader/prefilter.fs");
 	Shader brdfShader("../code/assets/shader/brdf.vs", "../code/assets/shader/brdf.fs");
 	Shader skyboxShader("../code/assets/shader/skybox.vs", "../code/assets/shader/skybox.fs");
+
 
 	// 着色器参数设置
 	pbrShader.use();
@@ -257,17 +258,20 @@ int main()
 	skyboxShader.setInt("environmentMap", 0);
 
 	// IBL 设定与生成
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 	initSkyboxFrameBuffer();
-	unsigned int envCubemap = loadCubemap("../code/assets/skybox/modern_evening_street_4k.hdr", equirectangularToCubemapShader);
+	unsigned int envCubemap = loadCubemap("../code/assets/skybox/street.hdr", equirectangularToCubemapShader);
 	unsigned int irradianceMap = createIrradianceMap(envCubemap, irradianceShader);
 	unsigned int prefilterMap = createPrefilterMap(envCubemap, prefilterShader);
 	unsigned int brdfLUTTexture = createBRDFLUT(brdfShader);
 
 	// Lights
-	pointLights.push_back({ glm::vec3(-10.0f,14.0f, -10.0f), glm::vec3(500.0f), 40.0f });
-	pointLights.push_back({ glm::vec3(20.0f, 14.0f, -10.0f), glm::vec3(500.0f), 40.0f });
-	pointLights.push_back({ glm::vec3(20.0f, 14.0f, 15.0f), glm::vec3(500.0f), 40.0f });
-	pointLights.push_back({ glm::vec3(-10.0f, 14.0f, 15.0f), glm::vec3(500.0f), 40.0f });
+	pointLights.push_back({ glm::vec3(-10.0f,14.125f, -10.0f), glm::vec3(500.0f), glm::vec3(0.0f, -1.0f, 0.0f), glm::cos(glm::radians(90.0f)),50.0f });
+	pointLights.push_back({ glm::vec3(20.0f, 14.125f, -10.0f), glm::vec3(500.0f), glm::vec3(0.0f, -1.0f, 0.0f), glm::cos(glm::radians(90.0f)),50.0f });
+	pointLights.push_back({ glm::vec3(20.0f, 14.125f, 15.0f), glm::vec3(500.0f), glm::vec3(0.0f, -1.0f, 0.0f), glm::cos(glm::radians(90.0f)),50.0f });
+	pointLights.push_back({ glm::vec3(-10.0f, 14.125f, 15.0f), glm::vec3(500.0f), glm::vec3(0.0f, -1.0f, 0.0f), glm::cos(glm::radians(90.0f)),50.0f });
 	initPointLights();
 
 	// =============================================================
@@ -306,10 +310,10 @@ int main()
 	sceneObjects.emplace_back(resBook2, glm::vec3(21.76f, 7.42f, -20.19f), glm::vec3(-90.0f), glm::vec3(0.065f));
 	sceneObjects.emplace_back(resBooks1, glm::vec3(17.66f, 0.16f, -20.73f), glm::vec3(90.0f, 270.0f, 90.0f), glm::vec3(0.789f));
 
-	sceneObjects.emplace_back(resLight, glm::vec3(-10.0f, 14.1f, 15.0f), glm::vec3(0.0f), glm::vec3(0.8f));
-	sceneObjects.emplace_back(resLight, glm::vec3(-10.0f, 14.1f, -10.0f), glm::vec3(0.0f), glm::vec3(0.8f));
-	sceneObjects.emplace_back(resLight, glm::vec3(20.0f, 14.1f, -10.0f), glm::vec3(0.0f), glm::vec3(0.8f));
-	sceneObjects.emplace_back(resLight, glm::vec3(20.0f, 14.1f, 15.0f), glm::vec3(0.0f), glm::vec3(0.8f));
+	sceneObjects.emplace_back(resLight, glm::vec3(-10.0f, 14.25f, 15.0f), glm::vec3(0.0f), glm::vec3(0.8f));
+	sceneObjects.emplace_back(resLight, glm::vec3(-10.0f, 14.25f, -10.0f), glm::vec3(0.0f), glm::vec3(0.8f));
+	sceneObjects.emplace_back(resLight, glm::vec3(20.0f, 14.25f, -10.0f), glm::vec3(0.0f), glm::vec3(0.8f));
+	sceneObjects.emplace_back(resLight, glm::vec3(20.0f, 14.25f, 15.0f), glm::vec3(0.0f), glm::vec3(0.8f));
 
 	sceneObjects.emplace_back(resTable, glm::vec3(14.0f, 1.0f, -11.0f), glm::vec3(0.0f), glm::vec3(5.0f));
 	sceneObjects.emplace_back(resChair, glm::vec3(10.0f, -0.2f, -13.0f), glm::vec3(0.0f), glm::vec3(30.0f));
@@ -442,6 +446,14 @@ int main()
 	skyboxShader.use();
 	skyboxShader.setMat4("projection", projection);
 
+	//FPS
+	double lastFPSUpdate = 0.0;
+	int frameCount = 0;
+	//trick
+	int shadowsNeedUpdate = 10;
+	//Matrix Build
+	BuildMatrix();
+
 	// render loop
 	// -----------
 	while (!glfwWindowShouldClose(window))
@@ -452,12 +464,26 @@ int main()
 
 		processInput(window);
 
+		//FPS
+		frameCount++;
+		if (currentFrame - lastFPSUpdate >= 1.0)
+		{
+			double fps = (double)frameCount / (currentFrame - lastFPSUpdate);
+			std::string title = "CG_Group8_FinalProject_V2.0 | FPS: " + std::to_string((int)fps);
+			glfwSetWindowTitle(window, title.c_str());
+			frameCount = 0;
+			lastFPSUpdate = currentFrame;
+		}
+
 		// 清空
 		glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		// 1. 阴影渲染
-		renderAllObjectsToDepth(depthShader);
+		if (shadowsNeedUpdate) {
+			renderAllObjectsToDepth(depthShader);
+			shadowsNeedUpdate --; // 渲染一次后关闭，除非有物体移动
+		}
 
 		// 2. PBR 主渲染
 		pbrShader.use();
@@ -466,24 +492,27 @@ int main()
 		pbrShader.setMat4("view", view);
 		pbrShader.setMat4("projection", projection);
 		pbrShader.setVec3("camPos", camera.Position);
-
+		pbrShader.setBool("useInstance",true);
 		// 绑定 IBL 贴图
 		glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap);
 		glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterMap);
 		glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D, brdfLUTTexture);
 
 		// 绑定灯光与阴影贴图
-		int validLightCount = min((int)pointLights.size(), 4);
+		int max_light = MAX_POINT_LIGHTS;
+		int validLightCount = min((int)pointLights.size(), max_light);
 		pbrShader.setInt("pointLightCount", validLightCount);
 		for (int i = 0; i < validLightCount; ++i)
 		{
 			std::string iStr = std::to_string(i);
-			pbrShader.setInt(("pointLightDepthCubemaps[" + iStr + "]").c_str(), 8 + i);
+			pbrShader.setInt(("pointLightDepthCubemaps[" + iStr + "]").c_str(), 10 + i);
 			pbrShader.setVec3(("pointLightsBase[" + iStr + "].position").c_str(), pointLights[i].position);
 			pbrShader.setVec3(("pointLightsBase[" + iStr + "].color").c_str(), pointLights[i].color);
+			pbrShader.setVec3(("pointLightsBase[" + iStr + "].direction").c_str(), pointLights[i].direction);
+			pbrShader.setFloat(("pointLightsBase[" + iStr + "].cutOff").c_str(), pointLights[i].cutOff);
 			pbrShader.setFloat(("pointLightsBase[" + iStr + "].far_plane").c_str(), pointLights[i].far_plane);
 
-			glActiveTexture(GL_TEXTURE8 + i);
+			glActiveTexture(GL_TEXTURE10 + i);
 			glBindTexture(GL_TEXTURE_CUBE_MAP, pointLights[i].depthCubemap);
 		}
 
@@ -502,31 +531,17 @@ int main()
 		pbrShader.setFloat("materialRoughness", 1.0f);
 		pbrShader.setFloat("materialMetallic", 0.1f);
 
-		int length = 10, width = 10, height = 3;
-		float l_spacing = 5.0f, w_spacing = 5.0f, h_spacing = 5.0f;
-		float h = 0.0f, l = -20.0, w = -20.0f;
-
 		// 1. 地面 (Marble)
 		glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D, marblealbedo);
 		glActiveTexture(GL_TEXTURE4); glBindTexture(GL_TEXTURE_2D, marblenormal);
 		glActiveTexture(GL_TEXTURE5); glBindTexture(GL_TEXTURE_2D, marbleheight);
 		glActiveTexture(GL_TEXTURE6); glBindTexture(GL_TEXTURE_2D, marbleroughness);
 		pbrShader.setBool("usePOM", true);
+		pbrShader.setBool("useheightMap", true);
 		pbrShader.setFloat("texScale", 1.0f); // 调整平铺
-		pbrShader.setFloat("heightScale", 0.002f);
-		w = -200.0f;
-		l = -200.0f;
-		for (int i = 0; i < 4; i++)
-		{
-			l = -100.0f;
-			for (int j = 0; j < 4; j++)
-			{
-				setModelMatrix(glm::vec3(w, -0.1, l), glm::vec3(100.0f, 3.0f, 100.0f), glm::vec3(0.0f), pbrShader);
-				renderGround();
-				l += 100.0f;
-			}
-			w += 100.0f;
-		}
+		pbrShader.setFloat("heightScale", 0.005f);
+
+		renderGround(GmodelMatrices, GNormalMatrices);
 
 		pbrShader.setBool("useAOMap", true);
 		// 2. 地板 (floor)
@@ -537,20 +552,9 @@ int main()
 		glActiveTexture(GL_TEXTURE7); glBindTexture(GL_TEXTURE_2D, floorAO);
 
 		pbrShader.setFloat("texScale", 1.0f); // 调整平铺
-		pbrShader.setFloat("heightScale", 0.002f);
+		pbrShader.setFloat("heightScale", 0.05f);
 
-		w = -20.0f;
-		for (int i = 0; i < width; i++)
-		{
-			l = -20.0f;
-			for (int j = 0; j < length; j++)
-			{
-				setModelMatrix(glm::vec3(w, h, l), glm::vec3(5.0f, 3.0f, 5.0f), glm::vec3(0.0f), pbrShader);
-				renderGround();
-				l += l_spacing;
-			}
-			w += w_spacing;
-		}
+		renderGround(FmodelMatrices, FNormalMatrices);
 
 		// 3. 墙壁 (Tiles)
 		glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D, tilesalbedo);
@@ -559,69 +563,9 @@ int main()
 		glActiveTexture(GL_TEXTURE6); glBindTexture(GL_TEXTURE_2D, tilesroughness);
 		glActiveTexture(GL_TEXTURE7); glBindTexture(GL_TEXTURE_2D, tilesao);
 		pbrShader.setFloat("texScale", 1.0f);
+		pbrShader.setFloat("heightScale", 0.05f);
 
-		// 墙壁循环逻辑
-
-		h = 2.0f;
-		for (int i = 0; i < height; i++)
-		{
-			float l = -20.0f;
-			for (int j = 0; j < length; j++)
-			{
-				// 左墙
-				setModelMatrix(glm::vec3(27.0f, h, l), glm::vec3(5.0f, 3.0f, 5.0f), glm::vec3(90.0f, 0.0f, 90.0f), pbrShader);
-				renderWall();
-				// 右墙
-				setModelMatrix(glm::vec3(-22.5f, h, l), glm::vec3(5.0f, 3.0f, 5.0f), glm::vec3(90.0f, 0.0f, 90.0f), pbrShader);
-				renderWall();
-				l += l_spacing;
-			}
-			h += h_spacing;
-		}
-		// 后墙
-		h = 2.0f;
-		for (int i = 0; i < height; i++)
-		{
-			l = -20.0f;
-			for (int j = 0; j < length; j++)
-			{
-				setModelMatrix(glm::vec3(l, h, -22.0), glm::vec3(5.0f, 3.0f, 5.0f), glm::vec3(90.0f, 0.0f, 0.0f), pbrShader);
-				renderWall();
-				l += l_spacing;
-			}
-			h += h_spacing;
-		}
-		// 前墙 (带门窗孔)
-		l = -20.0f;
-		for (int i = 0; i < length; i++)
-		{
-			if (i == 1)
-			{ // 门
-				setModelMatrix(glm::vec3(l, 10.9, 27.5), glm::vec3(5.0f, 3.0f, 7.0f), glm::vec3(90.0f, 0.0f, 0.0f), pbrShader);
-				renderWall();
-			}
-			else if (i == 4 || i == 8)
-			{ // 窗
-				float local_h = 2.0f;
-				for (int j = 0; j < 2; j++)
-				{
-					setModelMatrix(glm::vec3(l, local_h, 27.5), glm::vec3(5.0f, 3.0f, 5.0f), glm::vec3(90.0f, 0.0f, 0.0f), pbrShader);
-					renderWall();
-					local_h += 2 * h_spacing;
-				}
-			}
-			else
-			{ // 实心
-				float local_h = 2.0f;
-				for (int j = 0; j < height; j++)
-				{
-					setModelMatrix(glm::vec3(l, local_h, 27.5), glm::vec3(5.0f, 3.0f, 5.0f), glm::vec3(90.0f, 0.0f, 0.0f), pbrShader);
-					renderWall();
-					local_h += h_spacing;
-				}
-			}
-			l += l_spacing;
-		}
+		renderWall(WmodelMatrices, WNormalMatrices);
 
 		// 4. 天花板
 		glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D, ceilingalbedo);
@@ -629,24 +573,15 @@ int main()
 		glActiveTexture(GL_TEXTURE5); glBindTexture(GL_TEXTURE_2D, ceilingheight);
 		glActiveTexture(GL_TEXTURE6); glBindTexture(GL_TEXTURE_2D, ceilingroughness);
 		glActiveTexture(GL_TEXTURE7); glBindTexture(GL_TEXTURE_2D, ceilingao);
-		pbrShader.setBool("usePOM", false); // 天花板太远，无需POM
-
-		h = 15.0f;
-		w = -20.0f;
-		for (int i = 0; i < width; i++)
-		{
-			float l = -20.0f;
-			for (int j = 0; j < length; j++)
-			{
-				setModelMatrix(glm::vec3(w, h, l), glm::vec3(5.0f, 3.0f, 5.0f), glm::vec3(0.0f), pbrShader);
-				renderGround();
-				l += l_spacing;
-			}
-			w += w_spacing;
-		}
 
 
-		//if (!sceneObjects.empty()) {
+		renderGround(CmodelMatrices, CNormalMatrices);
+		pbrShader.setBool("useheightMap", false);
+		pbrShader.setBool("useInstance", false);
+		pbrShader.setBool("usePOM", false);
+
+		//if (!sceneObjects.empty()) 
+		//{
 		//    controlSingleObject(window, sceneObjects.back(), deltaTime); // 控制最后一个添加的物体
 		//}
 		// --- 渲染场景物体 ---
@@ -655,11 +590,14 @@ int main()
 		}
 
 		// --- 天空盒 ---
+		glEnable(GL_DEPTH_TEST);
+		glDepthFunc(GL_LEQUAL);
 		skyboxShader.use();
 		skyboxShader.setMat4("view", view);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
 		renderCube();
+		glDepthFunc(GL_LESS);
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
@@ -697,119 +635,20 @@ void renderAllObjectsToDepth(Shader& depthShader)
 		glBindFramebuffer(GL_FRAMEBUFFER, light.depthFBO);
 		glClear(GL_DEPTH_BUFFER_BIT);
 
-		for (unsigned int i = 0; i < 6; ++i) {
+		for (unsigned int i = 0; i < 6; ++i)
+		{
 			depthShader.setMat4(("shadowMatrices[" + std::to_string(i) + "]").c_str(), light.shadowMatrices[i]);
 		}
 		depthShader.setVec3("lightPos", light.position);
 		depthShader.setFloat("far_plane", light.far_plane);
 
-
-		int length = 10, width = 10, height = 3;;
-		float l_spacing = 5.0f, w_spacing = 5.0f, h_spacing = 5.0f;
-		float h = 2.0f, l = -20.0f;
-
-		for (int i = 0; i < height; i++)
-		{
-			l = -20.0f;
-			for (int j = 0; j < length; j++)
-			{
-				// 左墙
-				setModelMatrix(glm::vec3(27.0f, h, l), glm::vec3(5.0f, 3.0f, 5.0f), glm::vec3(90.0f, 0.0f, 90.0f), depthShader);
-				renderWall();
-				// 右墙
-				setModelMatrix(glm::vec3(-22.5f, h, l), glm::vec3(5.0f, 3.0f, 5.0f), glm::vec3(90.0f, 0.0f, 90.0f), depthShader);
-				renderWall();
-				l += l_spacing;
-			}
-			h += h_spacing;
-		}
-		// 后墙
-		h = 2.0f;
-		for (int i = 0; i < height; i++)
-		{
-			l = -20.0f;
-			for (int j = 0; j < length; j++)
-			{
-				setModelMatrix(glm::vec3(l, h, -22.0), glm::vec3(5.0f, 3.0f, 5.0f), glm::vec3(90.0f, 0.0f, 0.0f), depthShader);
-				renderWall();
-				l += l_spacing;
-			}
-			h += h_spacing;
-		}
-		// 前墙 (带门窗孔)
-		l = -20.0f;
-		for (int i = 0; i < length; i++)
-		{
-			if (i == 1)
-			{ // 门
-				setModelMatrix(glm::vec3(l, 10.9, 27.5), glm::vec3(5.0f, 3.0f, 7.0f), glm::vec3(90.0f, 0.0f, 0.0f), depthShader);
-				renderWall();
-			}
-			else if (i == 4 || i == 8)
-			{ // 窗
-				float local_h = 2.0f;
-				for (int j = 0; j < 2; j++)
-				{
-					setModelMatrix(glm::vec3(l, local_h, 27.5), glm::vec3(5.0f, 3.0f, 5.0f), glm::vec3(90.0f, 0.0f, 0.0f), depthShader);
-					renderWall();
-					local_h += 2 * h_spacing;
-				}
-			}
-			else { // 实心
-				float local_h = 2.0f;
-				for (int j = 0; j < height; j++)
-				{
-					setModelMatrix(glm::vec3(l, local_h, 27.5), glm::vec3(5.0f, 3.0f, 5.0f), glm::vec3(90.0f, 0.0f, 0.0f), depthShader);
-					renderWall();
-					local_h += h_spacing;
-				}
-			}
-			l += l_spacing;
-		}
-
-		// 地板
-		float w = -20.0f;
-		for (int i = 0; i < width; i++)
-		{
-			float l = -20.0f;
-			for (int j = 0; j < length; j++)
-			{
-				setModelMatrix(glm::vec3(w, 0.0f, l), glm::vec3(5.0f, 3.0f, 5.0f), glm::vec3(0.0f), depthShader);
-				renderGround();
-				l += l_spacing;
-			}
-			w += w_spacing;
-		}
-		// 地面
-		w = -200.0f;
-		l = -200.0f;
-		for (int i = 0; i < 4; i++)
-		{
-			l = -100.0f;
-			for (int j = 0; j < 4; j++)
-			{
-				setModelMatrix(glm::vec3(w, -0.1, l), glm::vec3(100.0f, 3.0f, 100.0f), glm::vec3(0.0f), depthShader);
-				renderGround();
-				l += 100.0f;
-			}
-			w += 100.0f;
-		}
-
-		// 天花板
-		w = -20.0f;
-		for (int i = 0; i < width; i++)
-		{
-			l = -20.0f;
-			for (int j = 0; j < length; j++)
-			{
-				setModelMatrix(glm::vec3(w, 15.0f, l), glm::vec3(5.0f, 3.0f, 5.0f), glm::vec3(0.0f), depthShader);
-				renderGround();
-				l += l_spacing;
-			}
-			w += w_spacing;
-		}
-
-		// 2. 渲染场景对象
+		depthShader.setBool("useInstance", true);
+		renderGround(GmodelMatrices, GNormalMatrices, true);
+		renderGround(FmodelMatrices, FNormalMatrices,true);
+		renderWall(WmodelMatrices, WNormalMatrices, true);
+		renderGround(CmodelMatrices, CNormalMatrices, true);
+		depthShader.setBool("useInstance", false);
+		 //2. 渲染场景对象
 		for (auto& obj : sceneObjects)
 		{
 			obj.DrawDepth(depthShader);
@@ -819,6 +658,8 @@ void renderAllObjectsToDepth(Shader& depthShader)
 	glCullFace(GL_BACK); // 恢复背面剔除
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
 }
 
 void initPointLights()
@@ -953,4 +794,8 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 	// make sure the viewport matches the new window dimensions; note that width and
 	// height will be significantly larger than specified on retina displays.
 	glViewport(0, 0, width, height);
+	SCR_WIDTH = width;
+	SCR_HEIGHT = height;
+	float lastX = SCR_WIDTH / 2.0f;
+	float lastY = SCR_HEIGHT / 2.0f;
 }

@@ -46,8 +46,10 @@ public:
 	unsigned int VAO;
 
 	glm::vec4 baseColorFactor;
+	glm::vec3 emissiveFactor;
 	float metallicFactor;
 	float roughnessFactor;
+	float transmissionFactor;
 
 	bool isGlass = false;
 	bool doubleSided = false;
@@ -55,8 +57,9 @@ public:
 
 	// constructor
 	Mesh(vector<Vertex> vertices, vector<unsigned int> indices, vector<Texture> textures,
-		glm::vec4 baseColor = glm::vec4(1.0f), float metallic = 1.0f, float roughness = 1.0f,
-		bool glass = false, bool doubleSide = false, bool isblend = false)
+		glm::vec4 baseColor = glm::vec4(1.0f), float metallic = 1.0f, float roughness = 1.0f, 
+		glm::vec3 emissiveFactor = glm::vec3(1.0f), float transmissionFactor = 1.0f,bool glass = false, bool doubleSide = false,
+		bool isblend = false)
 	{
 		this->vertices = vertices;
 		this->indices = indices;
@@ -65,6 +68,8 @@ public:
 		this->baseColorFactor = baseColor;
 		this->metallicFactor = metallic;
 		this->roughnessFactor = roughness;
+		this->emissiveFactor = emissiveFactor;
+		this->transmissionFactor = transmissionFactor;
 
 		this->isGlass = glass;
 		this->doubleSided = doubleSide;
@@ -114,8 +119,10 @@ public:
 
 		// 传递PBR材质因子
 		shader.setVec4("materialBaseColor", baseColorFactor);
+		shader.setVec3("materialEmissive", emissiveFactor);
 		shader.setFloat("materialMetallic", metallicFactor);
 		shader.setFloat("materialRoughness", roughnessFactor);
+		shader.setFloat("materialTransmission", transmissionFactor);
 
 		// 绑定纹理并设置标志位
 		bool hasAlbedo = false;
@@ -124,6 +131,8 @@ public:
 		bool hasAO = false;
 		bool hasMetallic = false;
 		bool hasRoughness = false;
+		bool hasEmissive = false;
+		bool hasTransmission = false;
 
 		//初始化玻璃材质参数
 		shader.setBool("isGlass", isGlass);
@@ -173,6 +182,14 @@ public:
 					//number = std::to_string(gltfmetallroughNr++);
 					hasMetallicRoughness = true;
 				}
+				else if (name == "emissiveMap")
+				{
+					hasEmissive = true;
+				}
+				else if (name == "transmissionMap")
+				{
+					hasTransmission = true;
+				}
 
 				glBindTexture(GL_TEXTURE_2D, textures[i].id);
 				glUniform1i(glGetUniformLocation(shader.ID, (name).c_str()), i + 3);
@@ -193,6 +210,8 @@ public:
 		shader.setBool("useAOMap", hasAO);
 		shader.setBool("useMetallicMap", hasMetallic);
 		shader.setBool("useRoughnessMap", hasRoughness);
+		shader.setBool("useEmissiveMap", hasEmissive);
+		shader.setBool("useTransmissionMap", hasTransmission);
 
 		//绘制逻辑
 		glBindVertexArray(VAO);

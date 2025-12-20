@@ -180,6 +180,8 @@ private:
         glm::vec4 baseColorFactor = glm::vec4(1.0f);
         float metallicFactor = 1.0f;
         float roughnessFactor = 1.0f;
+        float transmissionFactor = 1.0f;
+        glm::vec3 emissiveFactor = glm::vec3(1.0);
         bool isGlass = false;
         bool doubleSided = false;
         bool isblend = false;
@@ -213,6 +215,18 @@ private:
             if (material->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughness) == AI_SUCCESS) 
             {
                 roughnessFactor = roughness;
+            }
+
+            aiColor3D emissive(0.0f, 0.0f, 0.0f);
+            if (material->Get(AI_MATKEY_COLOR_EMISSIVE, emissive) == AI_SUCCESS) 
+            {
+                emissiveFactor = glm::vec3(emissive.r, emissive.g, emissive.b);
+            }
+
+            float transmission;
+            if (material->Get(AI_MATKEY_TRANSMISSION_FACTOR, transmission) == AI_SUCCESS)
+            {
+                transmissionFactor = transmission;
             }
 
             // 判断是否为玻璃材质（根据名称/参数特征）
@@ -279,9 +293,15 @@ private:
             // 加载粗糙度纹理和金属度纹理（GLTF金属度/粗糙度通常合并为一张纹理，需拆分）
             std::vector<Texture> roughness_metallicMaps = loadMaterialTextures(material, aiTextureType_GLTF_METALLIC_ROUGHNESS, "metallic_roughnessMap");
             textures.insert(textures.end(), roughness_metallicMaps.begin(), roughness_metallicMaps.end());
+
+            std::vector<Texture> emissiveMaps = loadMaterialTextures(material, aiTextureType_EMISSIVE, "emissiveMap");
+            textures.insert(textures.end(), emissiveMaps.begin(), emissiveMaps.end());
+
+            std::vector<Texture> transmissionMaps = loadMaterialTextures(material, aiTextureType_TRANSMISSION, "transmissionMap");
+            textures.insert(textures.end(), transmissionMaps.begin(), transmissionMaps.end());
         }
 
-        return Mesh(vertices, indices, textures, baseColorFactor, metallicFactor, roughnessFactor, isGlass, doubleSided, isblend);
+        return Mesh(vertices, indices, textures, baseColorFactor, metallicFactor, roughnessFactor, emissiveFactor, transmissionFactor, isGlass, doubleSided, isblend);
     }
 
     // 加载材质纹理

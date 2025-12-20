@@ -12,7 +12,10 @@ uniform sampler2D normalMap;
 uniform sampler2D metallicMap;
 uniform sampler2D roughnessMap;
 uniform sampler2D aoMap;
-uniform sampler2D metallic_roughnessMap;         
+uniform sampler2D metallic_roughnessMap;   
+uniform sampler2D emissiveMap;
+uniform sampler2D transmissionMap;
+uniform sampler2D heightMap;
 //gltf
 uniform bool gltf;
 //useMaterial?
@@ -22,12 +25,16 @@ uniform bool useMetallicRoughnessMap;
 uniform bool useMetallicMap;
 uniform bool useRoughnessMap;
 uniform bool useAOMap;
+uniform bool useEmissiveMap;
+uniform bool useheightMap;
+uniform bool useTransmissionMap;
 //Factor
 uniform vec4 materialBaseColor;
+uniform vec3 materialEmissive;
 uniform float materialMetallic;
 uniform float materialRoughness;
+uniform float materialTransmission;
 //POM
-uniform sampler2D heightMap;
 uniform bool usePOM;
 uniform float heightScale; 
 uniform bool heightMapInvert;   
@@ -38,17 +45,27 @@ uniform bool doubleSided;
 uniform samplerCube irradianceMap;   
 uniform samplerCube prefilterMap;     
 uniform sampler2D brdfLUT;            
-// lights
+// point lights
 #define MAX_POINT_LIGHTS 4
 struct PointLightBase 
 {
     vec3 position;
     vec3 color;
+    vec3 direction;
+    float cutOff;
     float far_plane;
 };
 uniform PointLightBase pointLightsBase[MAX_POINT_LIGHTS];
 uniform samplerCube pointLightDepthCubemaps[MAX_POINT_LIGHTS];
 uniform int pointLightCount;
+
+// parallel lights
+struct DirLight {
+    vec3 direction; // 从光源指向场景的方向
+    vec3 color;
+    bool enabled;
+};
+uniform DirLight dirLight;
 
 uniform vec3 camPos;
 
@@ -77,42 +94,42 @@ vec2 ParallaxMapping(vec2 texCoords, vec3 viewDir, float currentHeightScale)
     float currentLayerDepth = 0.0;
     
     // 修正偏移方向
-    vec2 P = viewDir.xy / viewDir.z * currentHeightScale; 
+    vec2 P = viewDir.xy / max(viewDir.z, 0.00001) * currentHeightScale; 
     vec2 deltaTexCoords = P / numLayers;
   
     vec2  currentTexCoords = texCoords;
-    
+    vec2 finalTexCoords;
 
-    // 循环采样
-    // 初始采样
-    float heightValue = textureGrad(heightMap, currentTexCoords, dx, dy).r;
-    if (heightMapInvert) heightValue = 1.0 - heightValue;
-
-    float currentDepthMapValue = heightValue;
-  
-    while(currentLayerDepth < currentDepthMapValue)
+    if(useheightMap)
     {
-        currentTexCoords -= deltaTexCoords;
-        
-        heightValue = textureGrad(heightMap, currentTexCoords, dx, dy).r;
+        float heightValue = textureGrad(heightMap, currentTexCoords, dx, dy).r;
         if (heightMapInvert) heightValue = 1.0 - heightValue;
-        
-        currentDepthMapValue = heightValue;  
-        currentLayerDepth += layerDepth;  
-    }
-    
-    //  深度插值
-    vec2 prevTexCoords = currentTexCoords + deltaTexCoords;
-    float afterDepth  = currentDepthMapValue - currentLayerDepth;
-    
-    float prevHeightValue = textureGrad(heightMap, prevTexCoords, dx, dy).r;
-    if (heightMapInvert) prevHeightValue = 1.0 - prevHeightValue;
-    
-    float beforeDepth = prevHeightValue - (currentLayerDepth - layerDepth);
-   
-    float weight = afterDepth / (afterDepth - beforeDepth);
-    vec2 finalTexCoords = prevTexCoords * weight + currentTexCoords * (1.0 - weight);
 
+        float currentDepthMapValue = heightValue;
+  
+        while(currentLayerDepth < currentDepthMapValue)
+        {
+            currentTexCoords -= deltaTexCoords;
+        
+            heightValue = textureGrad(heightMap, currentTexCoords, dx, dy).r;
+            if (heightMapInvert) heightValue = 1.0 - heightValue;
+        
+            currentDepthMapValue = heightValue;  
+            currentLayerDepth += layerDepth;  
+        }
+    
+        //  深度插值
+        vec2 prevTexCoords = currentTexCoords + deltaTexCoords;
+        float afterDepth  = currentDepthMapValue - currentLayerDepth;
+    
+        float prevHeightValue = textureGrad(heightMap, prevTexCoords, dx, dy).r;
+        if (heightMapInvert) prevHeightValue = 1.0 - prevHeightValue;
+    
+        float beforeDepth = prevHeightValue - (currentLayerDepth - layerDepth);
+   
+        float weight = afterDepth / (afterDepth - beforeDepth);
+        finalTexCoords = prevTexCoords * weight + currentTexCoords * (1.0 - weight);
+    }
     return finalTexCoords;
 }
 
@@ -135,7 +152,7 @@ float DistributionGGX(vec3 N, vec3 H, float roughness)
 
     float nom   = a2;
     float denom = (NdotH2 * (a2 - 1.0) + 1.0);
-    denom = PI * denom * denom;
+    denom = PI * denom * denom + 0.0001;
 
     return nom / denom;
 }
@@ -202,16 +219,52 @@ float calculatePointShadow(vec3 fragPos, int lightIndex, vec3 N)
             shadow += 1.0;
     }
     shadow /= float(samples);
-    if(currentDepth > far_plane) shadow = 0.0;
+    if(currentDepth > far_plane) 
+        shadow = 0.0;
 
     return shadow;
+}
+
+vec3 dirLightCalculate(vec3 albedo, vec3 N, vec3 F0, float roughness, float metallic, float alpha)
+{
+    vec3 Lo = vec3(0.0);
+
+    vec3 V = normalize(camPos - WorldPos);
+    vec3 L = normalize(-dirLight.direction);
+    vec3 H = normalize(V + L);
+    vec3 radiance = dirLight.color;
+
+    // Cook-Torrance BRDF
+    float NDF = DistributionGGX(N, H, roughness);   
+    float G   = GeometrySmith(N, V, L, roughness);      
+    vec3 F    = fresnelSchlick(max(dot(H, V), 0.0), F0);
+           
+    vec3 numerator    = NDF * G * F; 
+    float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
+    vec3 specular = numerator / denominator;
+        
+    vec3 kS = F;
+    vec3 kD = (vec3(1.0) - kS) * (1.0 - metallic);
+    float NdotL = max(dot(N, L), 0.0);        
+
+    if (isGlass) 
+    {
+        // 玻璃透射近似
+        float thicknessFactor = 1.0 - pow(max(dot(N, V), 0.0), 2.0);
+        vec3 transmitLight = dirLight.color * albedo * alpha * thicknessFactor * (1.0 - roughness * 0.5);
+        Lo += (specular * radiance * NdotL) + (transmitLight * kD);
+    } 
+    else 
+    {
+        Lo += (kD * albedo / PI + specular) * radiance * NdotL;
+    }
+
+    return Lo;
 }
 
 // ----------------------------------------------------------------------------
 void main()
 {	
-    vec3 viewDirWorld = normalize(camPos - WorldPos);
-    
     // 距离淡出
     float viewDistance = length(camPos - WorldPos);
     float pomFadeStart = 10.0;
@@ -230,13 +283,15 @@ void main()
         finalTexCoords = ParallaxMapping(TexCoords, viewDirTangent, effectiveHeightScale);
         
         // 丢弃边缘 (防止纹理重复处的伪影)
-        if(finalTexCoords.x > 1.0 || finalTexCoords.y > 1.0 || finalTexCoords.x < 0.0 || finalTexCoords.y < 0.0)
-            discard; 
+        //if(finalTexCoords.x > 1.0 || finalTexCoords.y > 1.0 || finalTexCoords.x < 0.0 || finalTexCoords.y < 0.0)
+        //  discard; 
     }
+
     vec4 albedoData = materialBaseColor;
     float metallic = materialMetallic;
     float roughness = materialRoughness;
     float ao = 1.0;
+    vec3 emissive = vec3(0.0);
 
     if(useAlbedoMap) 
     {
@@ -281,6 +336,13 @@ void main()
         ao = texture(aoMap, finalTexCoords).r;
     }
 
+    if (useEmissiveMap) 
+    {
+        emissive = texture(emissiveMap, finalTexCoords).rgb;
+        emissive = pow(emissive, vec3(2.2)); // 转换到线性空间
+        emissive *= materialEmissive;  // 乘上发光因子
+    }
+
     // 数据归一化
     metallic = clamp(metallic, 0.0, 1.0);
     roughness = clamp(roughness, 0.01, 0.99);
@@ -291,166 +353,89 @@ void main()
     float alpha = albedoData.a;
 
     vec3 N = getNormalFromMap(finalTexCoords);
-    vec3 V = viewDirWorld;
+    vec3 V = normalize(camPos - WorldPos);
     vec3 R = reflect(-V, N); 
 
-    // 玻璃材质逻辑
-    if (isGlass) 
-    {
-        // 双面渲染处理
-        if (doubleSided && dot(N, V) < 0.0) {
-            N = -N;
-        }
+    if (doubleSided && dot(N, V) < 0.0) N = -N;
 
-        vec3 F0 = vec3(0.04); 
-        F0 = mix(F0, albedo, metallic);
+    vec3 F0 = vec3(0.04); 
+    F0 = mix(F0, albedo, metallic);
+    vec3 Lo = vec3(0.0);
 
-        // 折射率参数
-        const float IOR_GLASS = 1.52;
-        const float IOR_AIR = 1.0;
-        vec3 Lo = vec3(0.0);
+    //if(dirLight.enabled)
+    //{
+    //    Lo += dirLightCalculate(albedo, N, F0, roughness, metallic, alpha);
+    //}
 
-        // 逐光源计算
-        for(int i = 0; i < pointLightCount; ++i) 
-        {   
-            PointLightBase light = pointLightsBase[i];
-            vec3 L = normalize(light.position - WorldPos);
-            vec3 H = normalize(V + L);
-            float distance = length(light.position - WorldPos);
-            float attenuation = 1.0 / (distance * distance);
-            vec3 radiance = light.color * attenuation;
+    for(int i = 0; i < pointLightCount; ++i) 
+    {   
+        PointLightBase light = pointLightsBase[i];
+        vec3 L = normalize(light.position - WorldPos);
+        //float theta = dot(L, normalize(-light.direction));
+        //if(theta < light.cutOff) 
+        //{
+            //continue;
+        //}
+        float distance = length(light.position - WorldPos);
+        vec3 H = normalize(V + L);
 
-            if(distance > light.far_plane)
-            {
-                continue;
-            }
-            // BRDF计算
-            float NDF = DistributionGGX(N, H, roughness);   
-            float G   = GeometrySmith(N, V, L, roughness);      
-            vec3 F    = fresnelSchlick(max(dot(H, V), 0.0), F0);
+        if(distance > light.far_plane){continue;};
+
+        float attenuation = 1.0 / (distance * distance);
+        vec3 radiance = light.color * attenuation;
+
+        // BRDF计算
+        float NDF = DistributionGGX(N, H, roughness);   
+        float G   = GeometrySmith(N, V, L, roughness);      
+        vec3 F    = fresnelSchlick(max(dot(H, V), 0.0), F0);
            
-            vec3 numerator    = NDF * G * F; 
-            float denominator = 4.0 * max(dot(N, V), 0.001) * max(dot(N, L), 0.001);
-            vec3 specular = numerator / denominator;
-            
-            // 玻璃透射光计算
-            vec3 transmitLight = vec3(0.0);
-            float NdotV = max(dot(N, V), 0.0);
-            vec3 transmitDir = refract(-V, N, IOR_AIR / IOR_GLASS);
-            bool isTotalReflection = length(transmitDir) < 0.001;
-
-            if (!isTotalReflection)
-            {
-                float thicknessFactor = 1.0 - pow(NdotV, 2.0);
-                transmitLight = light.color * albedo * alpha * attenuation * thicknessFactor;
-                transmitLight *= (1.0 - roughness * 0.5);
-            }
-
-            // 能量守恒
-            vec3 kS = F;
-            vec3 kD = vec3(1.0) - kS;
-            kD *= 1.0 - metallic;	  
-
-            float NdotL = max(dot(N, L), 0.0);        
-            Lo += specular * radiance * NdotL + transmitLight * kD;
-        }   
-
-        // IBL环境光计算
-        vec3 F = fresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
-        vec3 kS = F;
-        vec3 kD = 1.0 - kS;
-        kD *= 1.0 - metallic;	
-
-        vec3 irradiance = texture(irradianceMap, N).rgb;
-        vec3 diffuse = irradiance * albedo * alpha;
-
-        const float MAX_REFLECTION_LOD = 4.0;
-        vec3 prefilteredColor = textureLod(prefilterMap, R, roughness * MAX_REFLECTION_LOD).rgb;    
-        vec2 brdf = texture(brdfLUT, vec2(max(dot(N, V), 0.0), roughness)).rg;
-        vec3 specular = prefilteredColor * (F * brdf.x + brdf.y);
-
-        vec3 ambient = (kD * diffuse + specular) * alpha;
-    
-        // 色调映射 + Gamma校正
-        vec3 color = ambient + Lo;
-        color = color / (color + vec3(1.0));
-        color = pow(color, vec3(1.0/2.2)); 
-
-        FragColor = vec4(color, alpha);
-    } 
-    // 非玻璃材质）
-    else
-    {
-        // 参数归一化
-        metallic = clamp(metallic, 0.0, 1.0);
-        roughness = clamp(roughness, 0.01, 0.99);
-        ao = clamp(ao, 0.0, 1.0);
-
-        // 基础反射率F0
-        vec3 F0 = vec3(0.04); 
-        F0 = mix(F0, albedo, metallic);
-
-        // 逐光源计算直接光照
-        vec3 Lo = vec3(0.0);
-        for(int i = 0; i < pointLightCount; ++i) 
-        {   
-            PointLightBase light = pointLightsBase[i];
-            vec3 L = normalize(light.position - WorldPos);
-            vec3 H = normalize(V + L);
-            float distance = length(light.position - WorldPos);
-            float attenuation = 1.0 / (distance * distance);
-            vec3 radiance = light.color * attenuation;
-
-            if(distance > light.far_plane)
-            {
-                continue;
-            }
-
-            // 阴影计算
-            float shadow = calculatePointShadow(WorldPos, i, N);
-            float shadowFactor = 1.0 - shadow;
-
-            // BRDF计算
-            float NDF = DistributionGGX(N, H, roughness);   
-            float G   = GeometrySmith(N, V, L, roughness);      
-            vec3 F    = fresnelSchlick(max(dot(H, V), 0.0), F0);
-           
-            vec3 numerator    = NDF * G * F; 
-            float denominator = 4.0 * max(dot(N, V), 0.001) * max(dot(N, L), 0.001);
-            vec3 specular = numerator / denominator;
+        vec3 numerator    = NDF * G * F; 
+        float denominator = 4.0 * max(dot(N, V), 0.001) * max(dot(N, L), 0.001);
+        vec3 specular = numerator / denominator;
         
-            // 能量守恒
-            vec3 kS = F;
-            vec3 kD = vec3(1.0) - kS;
-            kD *= 1.0 - metallic;	  
-
-            float NdotL = max(dot(N, L), 0.0);        
-            Lo += (kD * albedo / PI + specular) * radiance * NdotL * shadowFactor;
-        }   
-
-        // IBL环境光计算
-        vec3 F = fresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
+        // 能量守恒
         vec3 kS = F;
-        vec3 kD = 1.0 - kS;
-        kD *= 1.0 - metallic;	  
+        vec3 kD = vec3(1.0) - kS;
+        kD *= 1.0 - metallic;	 
 
-        vec3 irradiance = texture(irradianceMap, N).rgb;
-        irradiance = clamp(irradiance, vec3(0.0), vec3(0.5)); // 限制环境光强度
-        vec3 diffuse = irradiance * albedo;
+        vec3 diffusePart = kD  * albedo / PI;
 
-        const float MAX_REFLECTION_LOD = 4.0;
-        vec3 prefilteredColor = textureLod(prefilterMap, R, roughness * MAX_REFLECTION_LOD).rgb;    
-        vec2 brdf = texture(brdfLUT, vec2(max(dot(N, V), 0.0), roughness)).rg;
-        vec3 specular = prefilteredColor * (F * brdf.x + brdf.y);
+            
+        // 阴影计算
+        float shadow = calculatePointShadow(WorldPos, i, N);
+        float shadowFactor = 1.0 - shadow;
 
-        // 环境光叠加AO
-        vec3 ambient = (kD * diffuse + specular) * ao;
+        float NdotL = max(dot(N, L), 0.0);        
+        Lo += (kD * albedo / PI + specular) * radiance * NdotL * shadowFactor;
+    }   
+
+    // IBL环境光计算
+    vec3 F = fresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
+    vec3 kS = F;
+    vec3 kD = 1.0 - kS;
+    kD *= 1.0 - metallic;	  
+
+    // 镜面反射 IBL
+    vec3 irradiance = texture(irradianceMap, N).rgb;
+    irradiance = clamp(irradiance, vec3(0.0), vec3(0.5)); // 限制环境光强度
+    vec3 diffuse = irradiance * albedo;
+
+    // 镜面反射 IBL
+    const float MAX_REFLECTION_LOD = 4.0;
+    vec3 prefilteredColor = textureLod(prefilterMap, R, roughness * MAX_REFLECTION_LOD).rgb;    
+    vec2 brdf = texture(brdfLUT, vec2(max(dot(N, V), 0.0), roughness)).rg;
+    vec3 specular = prefilteredColor * (F * brdf.x + brdf.y);
+
+    // 透射 IBL (看穿背景)
+
+    // 环境光叠加AO
+    vec3 ambient = (kD * diffuse + specular) * ao;
     
-        // 最终颜色计算
-        vec3 color = ambient + Lo;
-        color = color / (color + vec3(1.0)); // Reinhard色调映射
-        color = pow(color, vec3(1.0/2.2));  // Gamma校正
+    // 最终颜色计算
+    vec3 color = ambient + Lo + emissive;
+    color = color / (color + vec3(1.0)); // Reinhard色调映射
+    color = pow(color, vec3(1.0/2.2));  // Gamma校正
 
-        FragColor = vec4(color, alpha);
-    }
+    FragColor = vec4(color, alpha);
+    
 }
