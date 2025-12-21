@@ -43,9 +43,10 @@ struct Object
 	glm::vec3 position;
 	glm::vec3 rotation; // 欧拉角
 	glm::vec3 scale;
+	bool useIBL;
 
-	Object(Model* model, glm::vec3 pos, glm::vec3 rot, glm::vec3 scl)
-		: modelData(model), position(pos), rotation(rot), scale(scl) {
+	Object(Model* model, glm::vec3 pos, glm::vec3 rot, glm::vec3 scl, bool useIBL = false)
+		: modelData(model), position(pos), rotation(rot), scale(scl), useIBL(useIBL) {
 	}
 
 	// 计算模型矩阵
@@ -63,10 +64,15 @@ struct Object
 	// 正常渲染
 	void Draw(Shader& shader)
 	{
+		if (useIBL)
+		{
+			shader.setBool("useIBL", true);
+		}
 		glm::mat4 modelMatrix = getModelMatrix();
 		shader.setMat4("model", modelMatrix);
 		shader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(modelMatrix))));
 		modelData->Draw(shader);
+		shader.setBool("useIBL", false);
 	}
 
 	// 深度/阴影渲染
@@ -211,7 +217,7 @@ int main()
 	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
 
-	GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "CG_Group8_FinalProject_V2.0", NULL, NULL);
+	GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "CG_Group8_FinalProject_V2.1", NULL, NULL);
 	glfwMakeContextCurrent(window);
 	if (window == NULL)
 	{
@@ -324,7 +330,7 @@ int main()
 	sceneObjects.emplace_back(resBooks2, glm::vec3(14.5f, 2.67f, -12.0f), glm::vec3(0.0f), glm::vec3(3.13f));
 	sceneObjects.emplace_back(resBook3, glm::vec3(12.47f, 2.63f, -13.71f), glm::vec3(127.5f, 270.3f, 127.7f), glm::vec3(0.447f));
 
-	sceneObjects.emplace_back(resDoor, glm::vec3(-14.94f, -0.01f, 27.06f), glm::vec3(0.0f), glm::vec3(0.053f, 0.036f, 0.020f));
+	sceneObjects.emplace_back(resDoor, glm::vec3(-14.94f, -0.01f, 27.06f), glm::vec3(0.0f), glm::vec3(0.053f, 0.036f, 0.020f), true);
 
 	sceneObjects.emplace_back(resBookShelf2, glm::vec3(27.00f, -0.004f, -13.48f), glm::vec3(180.0f, 270.0f, 180.0f), glm::vec3(2.00f));
 	sceneObjects.emplace_back(resBookShelf2, glm::vec3(27.00f, -0.004f, -4.48f), glm::vec3(180.0f, 270.0f, 180.0f), glm::vec3(2.00f));
@@ -404,9 +410,8 @@ int main()
 	sceneObjects.emplace_back(respicture1, glm::vec3(-21.9169, 5.02535, 12.8817), glm::vec3(0.0f, 90.0f, 0.0f), glm::vec3(3.38485));
 	sceneObjects.emplace_back(respicture1, glm::vec3(-0.206604, 3.14911, -22.0161), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(3.40435));
 
-	sceneObjects.emplace_back(resWindow, glm::vec3(19.99f, 4.38f, 27.48f), glm::vec3(0.0f), glm::vec3(0.86f, 2.63f, 2.73f));
-	sceneObjects.emplace_back(resWindow, glm::vec3(0.009f, 4.35f, 27.48f), glm::vec3(0.0f), glm::vec3(0.87f, 2.63f, 3.93f));
-
+	sceneObjects.emplace_back(resWindow, glm::vec3(19.99f, 4.38f, 27.48f), glm::vec3(0.0f), glm::vec3(0.86f, 2.63f, 2.73f), true);
+	sceneObjects.emplace_back(resWindow, glm::vec3(0.009f, 4.35f, 27.48f), glm::vec3(0.0f), glm::vec3(0.87f, 2.63f, 3.93f), true);
 	// --------------------------
 	// 纹理加载
 
@@ -469,7 +474,7 @@ int main()
 		if (currentFrame - lastFPSUpdate >= 1.0)
 		{
 			double fps = (double)frameCount / (currentFrame - lastFPSUpdate);
-			std::string title = "CG_Group8_FinalProject_V2.0 | FPS: " + std::to_string((int)fps);
+			std::string title = "CG_Group8_FinalProject_V2.1 | FPS: " + std::to_string((int)fps);
 			glfwSetWindowTitle(window, title.c_str());
 			frameCount = 0;
 			lastFPSUpdate = currentFrame;
@@ -530,14 +535,15 @@ int main()
 		pbrShader.setVec4("materialBaseColor", glm::vec4(1.0f));
 		pbrShader.setFloat("materialRoughness", 1.0f);
 		pbrShader.setFloat("materialMetallic", 0.1f);
+		pbrShader.setVec3("environmentLight", glm::vec3(0.05f));
 
 		// 1. 地面 (Marble)
+		pbrShader.setBool("useheightMap", true);
 		glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D, marblealbedo);
 		glActiveTexture(GL_TEXTURE4); glBindTexture(GL_TEXTURE_2D, marblenormal);
 		glActiveTexture(GL_TEXTURE5); glBindTexture(GL_TEXTURE_2D, marbleheight);
 		glActiveTexture(GL_TEXTURE6); glBindTexture(GL_TEXTURE_2D, marbleroughness);
-		pbrShader.setBool("usePOM", true);
-		pbrShader.setBool("useheightMap", true);
+		pbrShader.setBool("useIBL", true);
 		pbrShader.setFloat("texScale", 1.0f); // 调整平铺
 		pbrShader.setFloat("heightScale", 0.005f);
 
@@ -550,7 +556,8 @@ int main()
 		glActiveTexture(GL_TEXTURE5); glBindTexture(GL_TEXTURE_2D, floorheight);
 		glActiveTexture(GL_TEXTURE6); glBindTexture(GL_TEXTURE_2D, floorRoughness);
 		glActiveTexture(GL_TEXTURE7); glBindTexture(GL_TEXTURE_2D, floorAO);
-
+		pbrShader.setBool("usePOM", true);
+		pbrShader.setBool("useIBL", false);
 		pbrShader.setFloat("texScale", 1.0f); // 调整平铺
 		pbrShader.setFloat("heightScale", 0.05f);
 
@@ -562,6 +569,7 @@ int main()
 		glActiveTexture(GL_TEXTURE5); glBindTexture(GL_TEXTURE_2D, tilesheight);
 		glActiveTexture(GL_TEXTURE6); glBindTexture(GL_TEXTURE_2D, tilesroughness);
 		glActiveTexture(GL_TEXTURE7); glBindTexture(GL_TEXTURE_2D, tilesao);
+		pbrShader.setBool("useIBL", true);
 		pbrShader.setFloat("texScale", 1.0f);
 		pbrShader.setFloat("heightScale", 0.05f);
 
@@ -573,12 +581,12 @@ int main()
 		glActiveTexture(GL_TEXTURE5); glBindTexture(GL_TEXTURE_2D, ceilingheight);
 		glActiveTexture(GL_TEXTURE6); glBindTexture(GL_TEXTURE_2D, ceilingroughness);
 		glActiveTexture(GL_TEXTURE7); glBindTexture(GL_TEXTURE_2D, ceilingao);
-
-
 		renderGround(CmodelMatrices, CNormalMatrices);
+
 		pbrShader.setBool("useheightMap", false);
 		pbrShader.setBool("useInstance", false);
 		pbrShader.setBool("usePOM", false);
+		pbrShader.setBool("useIBL", false);
 
 		//if (!sceneObjects.empty()) 
 		//{

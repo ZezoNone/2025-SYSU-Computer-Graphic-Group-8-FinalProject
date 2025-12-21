@@ -44,7 +44,10 @@ uniform bool doubleSided;
 // IBL
 uniform samplerCube irradianceMap;   
 uniform samplerCube prefilterMap;     
-uniform sampler2D brdfLUT;            
+uniform sampler2D brdfLUT;    
+uniform bool useIBL;
+//
+uniform vec3 environmentLight;
 // point lights
 #define MAX_POINT_LIGHTS 4
 struct PointLightBase 
@@ -58,6 +61,7 @@ struct PointLightBase
 uniform PointLightBase pointLightsBase[MAX_POINT_LIGHTS];
 uniform samplerCube pointLightDepthCubemaps[MAX_POINT_LIGHTS];
 uniform int pointLightCount;
+
 
 // parallel lights
 struct DirLight {
@@ -204,7 +208,7 @@ float calculatePointShadow(vec3 fragPos, int lightIndex, vec3 N)
     float shadow = 0.0;
     float NdotL = max(dot(N, normalize(lightPos - fragPos)), 0.0);
     
-    float bias = usePOM ? 0.08 : mix(0.05, 0.005, NdotL);
+    float bias = usePOM ? 0.08 : mix(0.015, 0.005, NdotL);
     
     if (isGlass) bias = 0.5; // 玻璃特殊处理
     
@@ -408,33 +412,41 @@ void main()
         float NdotL = max(dot(N, L), 0.0);        
         Lo += (kD * albedo / PI + specular) * radiance * NdotL * shadowFactor;
     }   
+    vec3 ambient;
+    if(useIBL)
+    {
+        // IBL环境光计算
+        vec3 F = fresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
+        vec3 kS = F;
+        vec3 kD = 1.0 - kS;
+        kD *= 1.0 - metallic;	  
 
-    // IBL环境光计算
-    vec3 F = fresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
-    vec3 kS = F;
-    vec3 kD = 1.0 - kS;
-    kD *= 1.0 - metallic;	  
+        // 漫反射 IBL
+        vec3 irradiance = texture(irradianceMap, N).rgb;
+        irradiance = clamp(irradiance, vec3(0.0), vec3(0.5)); // 限制环境光强度
+        vec3 diffuse = irradiance * albedo;
 
-    // 镜面反射 IBL
-    vec3 irradiance = texture(irradianceMap, N).rgb;
-    irradiance = clamp(irradiance, vec3(0.0), vec3(0.5)); // 限制环境光强度
-    vec3 diffuse = irradiance * albedo;
+        // 镜面反射 IBL
+        const float MAX_REFLECTION_LOD = 4.0;
+        vec3 prefilteredColor = textureLod(prefilterMap, R, roughness * MAX_REFLECTION_LOD).rgb;    
+        vec2 brdf = texture(brdfLUT, vec2(max(dot(N, V), 0.0), roughness)).rg;
+        vec3 specular = prefilteredColor * (F * brdf.x + brdf.y);
 
-    // 镜面反射 IBL
-    const float MAX_REFLECTION_LOD = 4.0;
-    vec3 prefilteredColor = textureLod(prefilterMap, R, roughness * MAX_REFLECTION_LOD).rgb;    
-    vec2 brdf = texture(brdfLUT, vec2(max(dot(N, V), 0.0), roughness)).rg;
-    vec3 specular = prefilteredColor * (F * brdf.x + brdf.y);
+        // 透射 IBL (看穿背景)
 
-    // 透射 IBL (看穿背景)
+        // 环境光叠加AO
+        ambient = (kD * diffuse + specular) * ao;
 
-    // 环境光叠加AO
-    vec3 ambient = (kD * diffuse + specular) * ao;
-    
+    }
     // 最终颜色计算
+    else
+    {
+        ambient = environmentLight * albedo * ao;
+    }
     vec3 color = ambient + Lo + emissive;
     color = color / (color + vec3(1.0)); // Reinhard色调映射
     color = pow(color, vec3(1.0/2.2));  // Gamma校正
+    
 
     FragColor = vec4(color, alpha);
     
